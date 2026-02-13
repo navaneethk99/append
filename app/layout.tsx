@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Append Auth",
-  description: "Signup with Better Auth and Google OAuth",
+  title: "Append",
+  description: "ai slop crud app",
 };
 
 export default function RootLayout({

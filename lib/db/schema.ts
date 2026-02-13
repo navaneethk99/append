@@ -25,22 +25,30 @@ export const appendListPerson = pgTable("append_list_person", {
     .notNull()
     .references(() => appendListTable.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
+  emailId: text("email_id"),
+  registerNo: text("register_no"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
 
-export const appendListTableRelations = relations(appendListTable, ({ one, many }) => ({
-  owner: one(user, {
-    fields: [appendListTable.listOwner],
-    references: [user.id],
+export const appendListTableRelations = relations(
+  appendListTable,
+  ({ one, many }) => ({
+    owner: one(user, {
+      fields: [appendListTable.listOwner],
+      references: [user.id],
+    }),
+    people: many(appendListPerson),
   }),
-  people: many(appendListPerson),
-}));
+);
 
-export const appendListPersonRelations = relations(appendListPerson, ({ one }) => ({
-  list: one(appendListTable, {
-    fields: [appendListPerson.appendListId],
-    references: [appendListTable.id],
+export const appendListPersonRelations = relations(
+  appendListPerson,
+  ({ one }) => ({
+    list: one(appendListTable, {
+      fields: [appendListPerson.appendListId],
+      references: [appendListTable.id],
+    }),
   }),
-}));
+);
