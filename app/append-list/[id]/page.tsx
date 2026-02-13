@@ -396,11 +396,25 @@ export default function JoinAppendListPage() {
         },
       });
 
-      const formatted = payload.rows
-        .map((person, index) =>
-          `${index + 1}. ${person.name}`,
-        )
-        .join("\n");
+      const formatted =
+        payload.listType === "github"
+          ? payload.rows
+              .map((person) => person.githubUsername?.trim())
+              .filter((username): username is string => Boolean(username))
+              .map((username, index) => `${index + 1}. ${username}`)
+              .join("\n")
+          : payload.rows
+              .map((person, index) => `${index + 1}. ${person.name}`)
+              .join("\n");
+
+      if (!formatted.trim()) {
+        setError(
+          payload.listType === "github"
+            ? "No GitHub usernames to copy yet."
+            : "No entries to copy yet.",
+        );
+        return;
+      }
 
       await navigator.clipboard.writeText(formatted);
       setCopySuccess(true);
