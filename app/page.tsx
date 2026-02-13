@@ -148,7 +148,7 @@ export default function Home() {
       }
 
       const json = subscription.toJSON();
-      if (!json.keys?.p256dh || !json.keys?.auth) {
+      if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
         return;
       }
 
