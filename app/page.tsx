@@ -20,6 +20,7 @@ export default function Home() {
   const [lists, setLists] = useState<AppendList[]>([]);
   const [copiedListId, setCopiedListId] = useState<string | null>(null);
   const [deletingListId, setDeletingListId] = useState<string | null>(null);
+  const [exportingListId, setExportingListId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -119,6 +120,31 @@ export default function Home() {
     setDeletingListId(null);
   };
 
+  const handleExportCsv = async (list: AppendList) => {
+    setExportingListId(list.id);
+
+    const response = await fetch(`/api/append-lists/${list.id}/export`, {
+      method: "GET",
+    });
+
+    if (!response.ok) {
+      setExportingListId(null);
+      return;
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${list.title.replace(/\s+/g, "-").toLowerCase()}-names.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+
+    setExportingListId(null);
+  };
+
   return (
     <main className="grid min-h-screen place-items-center px-6 py-16">
       <section className="w-full max-w-2xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
@@ -200,6 +226,16 @@ export default function Home() {
                         className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
                       >
                         {deletingListId === list.id ? "Deleting..." : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleExportCsv(list)}
+                        disabled={exportingListId === list.id}
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {exportingListId === list.id
+                          ? "Exporting..."
+                          : "Export as CSV"}
                       </button>
                     </div>
                   </article>
