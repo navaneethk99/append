@@ -239,7 +239,13 @@ export const getListDetail = query({
     if (args.viewer) {
       const email = args.viewer.email?.trim().toLowerCase();
       const name = args.viewer.name?.trim();
-      const joinedRecord = await findJoinedRecord(db, tableName, list._id, email, name);
+      const joinedRecord = await findJoinedRecord(
+        db,
+        tableName,
+        list._id,
+        email,
+        name,
+      );
       joined = Boolean(joinedRecord);
     }
 
@@ -248,6 +254,7 @@ export const getListDetail = query({
       name: string;
       registerNo?: string;
       githubUsername?: string;
+      input1?: string[];
     }> = [];
     if (listType === "github") {
       const people = await db
@@ -277,6 +284,7 @@ export const getListDetail = query({
           id: person._id,
           name: person.name,
           registerNo: person.registerNo,
+          input1: person.input1,
         }));
     } else {
       const people = await db
@@ -336,7 +344,13 @@ export const joinList = mutation({
     const name = args.name?.trim() || args.email?.trim() || "Anonymous";
     const email = args.email?.trim().toLowerCase();
 
-    const existing = await findJoinedRecord(db, tableName, list._id, email, name);
+    const existing = await findJoinedRecord(
+      db,
+      tableName,
+      list._id,
+      email,
+      name,
+    );
 
     if (existing) {
       return { person: { id: existing._id, name: existing.name } };
@@ -364,7 +378,9 @@ export const joinList = mutation({
     }
 
     if (listType === "others") {
-      const input1 = (args.otherInputs ?? []).map((value) => value.trim()).filter(Boolean);
+      const input1 = (args.otherInputs ?? [])
+        .map((value) => value.trim())
+        .filter(Boolean);
 
       if (input1.length === 0) {
         throw new Error("At least one input is required");
@@ -417,7 +433,13 @@ export const leaveList = mutation({
     const email = args.email?.trim().toLowerCase();
     const name = args.name?.trim();
 
-    const existing = await findJoinedRecord(db, tableName, list._id, email, name);
+    const existing = await findJoinedRecord(
+      db,
+      tableName,
+      list._id,
+      email,
+      name,
+    );
 
     if (existing) {
       await db.delete(existing._id);
@@ -455,7 +477,13 @@ export const getExportRows = query({
     if (!joined) {
       const email = args.viewer.email?.trim().toLowerCase();
       const name = args.viewer.name?.trim();
-      const joinedRecord = await findJoinedRecord(db, tableName, list._id, email, name);
+      const joinedRecord = await findJoinedRecord(
+        db,
+        tableName,
+        list._id,
+        email,
+        name,
+      );
       joined = Boolean(joinedRecord);
     }
 

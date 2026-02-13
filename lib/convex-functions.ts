@@ -3,18 +3,12 @@ import type { FunctionReference } from "convex/server";
 type QueryRef<
   Args extends Record<string, unknown> = Record<string, never>,
   Result = unknown,
-> = FunctionReference<
-  "query",
-  "public",
-  Args,
-  Result
->;
+> = FunctionReference<"query", "public", Args, Result>;
 
 type MutationRef<
   Args extends Record<string, unknown> = Record<string, never>,
   Result = unknown,
-> =
-  FunctionReference<"mutation", "public", Args, Result>;
+> = FunctionReference<"mutation", "public", Args, Result>;
 
 const query = <Args extends Record<string, unknown>, Result>(name: string) =>
   name as unknown as QueryRef<Args, Result>;
@@ -36,6 +30,7 @@ export type AppendPerson = {
   name: string;
   registerNo?: string;
   githubUsername?: string;
+  input1?: string[];
 };
 
 export type ListPermissions = {
@@ -68,8 +63,23 @@ export type ExportRows = {
   }>;
 };
 
+export type NotificationItem = {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: number;
+  createdByEmail?: string;
+};
+
+export type NotificationState = {
+  isAdmin: boolean;
+  notifications: NotificationItem[];
+};
+
 export const convexFunctions = {
-  getOwnedLists: query<{ ownerId: string }, AppendList[]>("appendLists:getOwnedLists"),
+  getOwnedLists: query<{ ownerId: string }, AppendList[]>(
+    "appendLists:getOwnedLists",
+  ),
   createList: mutation<
     {
       ownerId: string;
@@ -79,9 +89,10 @@ export const convexFunctions = {
     },
     AppendList
   >("appendLists:createList"),
-  deleteList: mutation<{ listId: string; ownerId: string }, { success: boolean }>(
-    "appendLists:deleteList",
-  ),
+  deleteList: mutation<
+    { listId: string; ownerId: string },
+    { success: boolean }
+  >("appendLists:deleteList"),
   getListDetail: query<
     {
       listId: string;
@@ -112,4 +123,16 @@ export const convexFunctions = {
     { listId: string; viewer: { id: string; email?: string; name?: string } },
     ExportRows
   >("appendLists:getExportRows"),
+  getNotificationState: query<
+    { viewerId: string; viewerEmail?: string },
+    NotificationState
+  >("notifications:getNotificationState"),
+  createNotification: mutation<
+    { viewerId: string; viewerEmail: string; title: string; message: string },
+    { id: string; createdAt: number }
+  >("notifications:createNotification"),
+  acknowledgeNotification: mutation<
+    { notificationId: string; viewerId: string },
+    { success: boolean }
+  >("notifications:acknowledgeNotification"),
 };

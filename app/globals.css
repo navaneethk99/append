@@ -166,6 +166,14 @@ body {
   opacity: 0.6;
 }
 
+.acm-label-hover:hover {
+  border: 2px solid #e8553f;
+  opacity: 0.4;
+  width: 100%;
+  height: 100%;
+  box-shadow: 0 12px 28px rgba(249, 95, 74, 0.35);
+}
+
 .acm-text-body {
   font-family: var(--font-polysans), sans-serif;
   font-weight: 400;
@@ -426,4 +434,72 @@ body {
 
 .animate-acm-slide-up {
   animation: acm-slide-up 0.6s ease forwards;
+}
+
+.acm-notification-shell {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 50;
+  width: min(420px, 90vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.acm-notification-card {
+  background: rgba(5, 5, 5, 0.85);
+  border: 1px solid rgba(254, 252, 217, 0.2);
+  border-radius: 20px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+}
+
+.acm-notification-admin {
+  border-color: rgba(249, 95, 74, 0.5);
+  background: rgba(15, 8, 6, 0.92);
+}
+
+.acm-notification-input {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.acm-notification-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.acm-notification-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+}
+
+.acm-notification-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 92vw);
+  border-radius: 24px;
+  padding: 1.5rem;
+  background: rgba(10, 8, 8, 0.95);
+  border: 1px solid rgba(249, 95, 74, 0.4);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 640px) {
+  .acm-notification-shell {
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
 }
