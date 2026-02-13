@@ -7,6 +7,8 @@ const secret = process.env.BETTER_AUTH_SECRET;
 const baseURL = process.env.BETTER_AUTH_URL;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const githubClientId = process.env.GITHUB_CLIENT_ID;
+const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
 
 if (!secret) {
   throw new Error("BETTER_AUTH_SECRET is not set");
@@ -20,6 +22,10 @@ if (!googleClientId || !googleClientSecret) {
   throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
 }
 
+if (!githubClientId || !githubClientSecret) {
+  throw new Error("GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET must be set");
+}
+
 export const auth = betterAuth({
   secret,
   baseURL,
@@ -27,6 +33,13 @@ export const auth = betterAuth({
     provider: "pg",
     schema,
   }),
+  account: {
+    accountLinking: {
+      enabled: true,
+      allowDifferentEmails: true,
+      trustedProviders: ["google", "github"],
+    },
+  },
   socialProviders: {
     google: {
       clientId: googleClientId,
@@ -34,6 +47,10 @@ export const auth = betterAuth({
       hd: "vitstudent.ac.in",
       accessType: "offline",
       prompt: "select_account consent",
+    },
+    github: {
+      clientId: githubClientId,
+      clientSecret: githubClientSecret,
     },
   },
 });

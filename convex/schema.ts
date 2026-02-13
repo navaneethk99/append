@@ -6,6 +6,9 @@ export default defineSchema({
     publicId: v.string(),
     title: v.string(),
     description: v.string(),
+    listType: v.optional(
+      v.union(v.literal("nightslip"), v.literal("github"), v.literal("others")),
+    ),
     listOwner: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -18,6 +21,30 @@ export default defineSchema({
     name: v.string(),
     emailId: v.optional(v.string()),
     registerNo: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_list", ["appendListId"])
+    .index("by_list_email", ["appendListId", "emailId"])
+    .index("by_list_name", ["appendListId", "name"]),
+
+  appendListGithubPeople: defineTable({
+    appendListId: v.id("appendLists"),
+    name: v.string(),
+    emailId: v.optional(v.string()),
+    registerNo: v.optional(v.string()),
+    githubUsername: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_list", ["appendListId"])
+    .index("by_list_email", ["appendListId", "emailId"])
+    .index("by_list_name", ["appendListId", "name"]),
+
+  appendListOtherPeople: defineTable({
+    appendListId: v.id("appendLists"),
+    name: v.string(),
+    emailId: v.optional(v.string()),
+    registerNo: v.optional(v.string()),
+    input1: v.array(v.string()),
     createdAt: v.number(),
   })
     .index("by_list", ["appendListId"])
