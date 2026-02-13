@@ -1,0 +1,26 @@
+import { defineSchema, defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export default defineSchema({
+  appendLists: defineTable({
+    publicId: v.string(),
+    title: v.string(),
+    description: v.string(),
+    listOwner: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_public_id", ["publicId"])
+    .index("by_owner_createdAt", ["listOwner", "createdAt"]),
+
+  appendListPeople: defineTable({
+    appendListId: v.id("appendLists"),
+    name: v.string(),
+    emailId: v.optional(v.string()),
+    registerNo: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_list", ["appendListId"])
+    .index("by_list_email", ["appendListId", "emailId"])
+    .index("by_list_name", ["appendListId", "name"]),
+});

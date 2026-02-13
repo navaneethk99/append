@@ -31,9 +31,9 @@ export const auth = betterAuth({
     google: {
       clientId: googleClientId,
       clientSecret: googleClientSecret,
-      hd: "vitstudent.ac.in",
-      accessType: "offline",
-      prompt: "select_account consent",
+      // hd: "vitstudent.ac.in",
+      // accessType: "offline",
+      // prompt: "select_account consent",
     },
   },
 });
