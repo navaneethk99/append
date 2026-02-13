@@ -1,0 +1,21 @@
+<svg width="520" height="520" viewBox="0 0 520 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="520" height="520" fill="#060606"/>
+  <g opacity="0.12" stroke="#FEFCD9" stroke-width="1">
+    <path d="M0 40H520"/>
+    <path d="M0 120H520"/>
+    <path d="M0 200H520"/>
+    <path d="M0 280H520"/>
+    <path d="M0 360H520"/>
+    <path d="M0 440H520"/>
+    <path d="M40 0V520"/>
+    <path d="M120 0V520"/>
+    <path d="M200 0V520"/>
+    <path d="M280 0V520"/>
+    <path d="M360 0V520"/>
+    <path d="M440 0V520"/>
+  </g>
+  <g opacity="0.08" stroke="#F95F4A" stroke-width="1">
+    <path d="M0 0L520 520"/>
+    <path d="M520 0L0 520"/>
+  </g>
+</svg>

@@ -188,182 +188,261 @@ export default function Home() {
 
   return (
     <>
-      <main className="grid min-h-screen place-items-center px-6 py-16">
-        <section className="w-full max-w-2xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">
-            Append
-          </p>
+      <main className="acm-bg-dot-grid relative min-h-screen overflow-hidden px-6 py-12">
+        <div className="acm-glow-ball left-[-80px] top-12 bg-[#F95F4A]" />
+        <div className="acm-glow-ball bottom-[-120px] right-[-40px] bg-[#FF007A]" />
 
-        {isPending ? (
-          <>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-              Checking session
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Please wait while we verify your sign-in.
-            </p>
-          </>
-        ) : session?.user ? (
-          <>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-              Welcome back, {session.user.name}
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              You are signed in as {session.user.email}.
-            </p>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={handleOpenCreateModal}
-                disabled={isCreating}
-                className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isCreating ? "Creating..." : "Add Append List"}
-              </button>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isSigningOut ? "Signing out..." : "Sign out"}
-              </button>
+        <div className="relative z-10 mx-auto h-full flex w-full flex-col gap-10">
+          <header className="flex flex-wrap items-center justify-between gap-6">
+            <div className="max-w-2xl space-y-3">
+              {/*<p className="acm-label">ACM-VIT</p>*/}
+              <h1 className="acm-heading-display text-4xl md:text-5xl">
+                navappends
+              </h1>
+              <p className="acm-text-body text-sm text-white/70">
+                Spin up append lists, invite contributors, and keep the feed
+                moving with a control-room experience.
+              </p>
             </div>
-
-            <div className="mt-8 space-y-3">
-              {lists === undefined ? (
-                <p className="text-sm text-slate-600">Loading your append lists...</p>
-              ) : lists.length === 0 ? (
-                <p className="text-sm text-slate-600">No append lists yet.</p>
-              ) : (
-                lists.map((list) => (
-                  <article
-                    key={list.id}
-                    className="rounded-xl border border-slate-200 bg-white p-4"
-                  >
-                    <h2 className="text-base font-semibold text-slate-900">
-                      {list.title}
-                    </h2>
-                    <p className="mt-1 text-sm text-slate-600">{list.description}</p>
-                    <p className="mt-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-                      Type: {list.type}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Created on {new Date(list.createdAt).toLocaleDateString()}
-                    </p>
-                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyLink(list.id)}
-                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
-                      >
-                        {copiedListId === list.id ? "Copied" : "Click to Copy"}
-                      </button>
-                      <a
-                        href={`/append-list/${list.id}`}
-                        className="rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-sky-700"
-                      >
-                        Load Append List
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteList(list.id)}
-                        disabled={deletingListId === list.id}
-                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {deletingListId === list.id ? "Deleting..." : "Delete"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleExportCsv(list)}
-                        disabled={exportingListId === list.id}
-                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {exportingListId === list.id
-                          ? "Exporting..."
-                          : "Export as CSV"}
-                      </button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
-
-          </>
-        ) : (
-          <>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
-              Create your account
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Sign up in one click with Google.
-            </p>
-            <div className="mt-8">
-              <GoogleSignInButton />
-            </div>
-          </>
-        )}
-        </section>
-      </main>
-      {showCreateModal && session?.user ? (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl backdrop-blur">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Create Append List
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Enter a name and description for your new append list.
-            </p>
-
-            <div className="mt-5 space-y-3">
-              <select
-                value={newListType}
-                onChange={(event) =>
-                  setNewListType(
-                    event.target.value as "nightslip" | "github" | "others",
-                  )
-                }
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
-              >
-                <option value="nightslip">nightslip</option>
-                <option value="github">github</option>
-                <option value="others">others</option>
-              </select>
-              <input
-                value={newTitle}
-                onChange={(event) => setNewTitle(event.target.value)}
-                placeholder="Append list name"
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
-              />
-              <textarea
-                value={newDescription}
-                onChange={(event) => setNewDescription(event.target.value)}
-                placeholder="Append list description"
-                className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
-              />
-              {createError ? (
-                <p className="text-sm font-medium text-red-600">{createError}</p>
+            <div className="flex items-center gap-3">
+              {session?.user ? (
+                <span className="acm-pill">
+                  <span className="acm-status-dot" />
+                  Live
+                </span>
+              ) : null}
+              {session?.user ? (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  disabled={isSigningOut}
+                  className="acm-btn-ghost text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSigningOut ? "Signing out..." : "Sign out"}
+                </button>
               ) : null}
             </div>
+          </header>
 
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={handleAddAppendList}
-                disabled={isCreating}
-                className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                {isCreating ? "Creating..." : "Create"}
-              </button>
-              <button
-                type="button"
-                onClick={handleCloseCreateModal}
-                disabled={isCreating}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                Cancel
-              </button>
+          <div className="flex h-full w-full justify-center items-center">
+            <section className="acm-card acm-card-featured">
+              <div className="relative z-10 space-y-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  {/*<div className="acm-pill">Session</div>*/}
+                </div>
+
+                {isPending ? (
+                  <div className="acm-glass rounded-2xl p-4 text-sm text-white/70">
+                    Checking session status...
+                  </div>
+                ) : session?.user ? (
+                  <div className="space-y-3">
+                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                      <p className="text-sm text-white/70">
+                        Signed in as{" "}
+                        <span className="text-white">{session.user.email}</span>
+                      </p>
+                    </div>
+                    {lists === undefined ? (
+                      <p className="text-sm text-white/70">
+                        Loading your append lists...
+                      </p>
+                    ) : lists.length === 0 ? (
+                      <div className="space-y-3 text-center">
+                        <p className="text-sm text-white/70">
+                          No append lists yet.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleOpenCreateModal}
+                          disabled={isCreating}
+                          className="acm-btn-primary text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {isCreating ? "Creating..." : "Create Append List"}
+                        </button>
+                      </div>
+                    ) : (
+                      lists.map((list) => (
+                        <article
+                          key={list.id}
+                          className="acm-glass rounded-2xl p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <h3 className="text-base font-semibold text-white">
+                                {list.title}
+                              </h3>
+                              <p className="mt-1 text-sm text-white/60">
+                                {list.description}
+                              </p>
+                            </div>
+                            <span className="acm-pill">Type {list.type}</span>
+                          </div>
+                          <p className="mt-2 text-xs text-white/50">
+                            Created on{" "}
+                            {new Date(list.createdAt).toLocaleDateString()}
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyLink(list.id)}
+                              className="acm-btn-ghost text-[0.65rem]"
+                            >
+                              {copiedListId === list.id
+                                ? "Copied"
+                                : "Copy Link"}
+                            </button>
+                            <a
+                              href={`/append-list/${list.id}`}
+                              className="acm-btn-primary text-[0.65rem]"
+                            >
+                              Load Append List
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => handleExportCsv(list)}
+                              disabled={exportingListId === list.id}
+                              className="acm-btn-ghost text-[0.65rem] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {exportingListId === list.id
+                                ? "Exporting..."
+                                : "Export CSV"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteList(list.id)}
+                              disabled={deletingListId === list.id}
+                              className="acm-btn-ghost acm-btn-danger text-[0.65rem] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {deletingListId === list.id
+                                ? "Deleting..."
+                                : "Delete"}
+                            </button>
+                          </div>
+                        </article>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <h2 className="acm-heading text-lg">Create your account</h2>
+                    <p className="text-sm text-white/70">
+                      Sign up in one click with Google to create append lists.
+                    </p>
+                    <GoogleSignInButton />
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/*<aside className="acm-card">
+              <div className="relative z-10 space-y-6">
+                <div>
+                  <p className="acm-label">Quick Actions</p>
+                  <h2 className="acm-heading text-lg">Start a New List</h2>
+                </div>
+
+                {isPending ? (
+                  <p className="text-sm text-white/70">
+                    Standing by for session check.
+                  </p>
+                ) : session?.user ? (
+                  <>
+                    <p className="text-sm text-white/70">
+                      Create a fresh append list and share it with your team.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleOpenCreateModal}
+                      disabled={isCreating}
+                      className="acm-btn-primary w-full text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isCreating ? "Creating..." : "Add Append List"}
+                    </button>
+                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                      <p className="acm-label">Status</p>
+                      <p className="mt-2 text-sm text-white/70">
+                        {lists?.length ?? 0} active list
+                        {lists?.length === 1 ? "" : "s"} in your console.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-white/70">
+                      Sign in to unlock list management and exports.
+                    </p>
+                    <GoogleSignInButton />
+                  </div>
+                )}
+              </div>
+            </aside>*/}
+          </div>
+        </div>
+      </main>
+
+      {showCreateModal && session?.user ? (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 px-4">
+          <div className="acm-card w-full max-w-lg">
+            <div className="relative z-10 space-y-5">
+              <div>
+                <h2 className="acm-heading text-lg">Create Append List</h2>
+                <p className="text-sm text-white/70">
+                  Enter a name and description for your new append list.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <select
+                  value={newListType}
+                  onChange={(event) =>
+                    setNewListType(
+                      event.target.value as "nightslip" | "github" | "others",
+                    )
+                  }
+                  className="acm-input text-sm"
+                >
+                  <option value="nightslip">nightslip</option>
+                  <option value="github">github</option>
+                  <option value="others">others</option>
+                </select>
+                <input
+                  value={newTitle}
+                  onChange={(event) => setNewTitle(event.target.value)}
+                  placeholder="Append list name"
+                  className="acm-input text-sm"
+                />
+                <textarea
+                  value={newDescription}
+                  onChange={(event) => setNewDescription(event.target.value)}
+                  placeholder="Append list description"
+                  className="acm-input min-h-28 text-sm"
+                />
+                {createError ? (
+                  <p className="text-sm font-medium text-rose-300">
+                    {createError}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleAddAppendList}
+                  disabled={isCreating}
+                  className="acm-btn-primary flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isCreating ? "Creating..." : "Create"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseCreateModal}
+                  disabled={isCreating}
+                  className="acm-btn-ghost flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         </div>
