@@ -27,6 +27,9 @@ export default function Home() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [newListType, setNewListType] = useState<
+    "nightslip" | "github" | "others"
+  >("nightslip");
   const [createError, setCreateError] = useState<string | null>(null);
 
   const handleSignOut = async () => {
@@ -44,6 +47,7 @@ export default function Home() {
     setShowCreateModal(false);
     setNewTitle("");
     setNewDescription("");
+    setNewListType("nightslip");
     setCreateError(null);
   };
 
@@ -63,7 +67,12 @@ export default function Home() {
     setIsCreating(true);
 
     try {
-      await createList({ ownerId: session.user.id, title, description });
+      await createList({
+        ownerId: session.user.id,
+        title,
+        description,
+        listType: newListType,
+      });
       handleCloseCreateModal();
     } catch {
       setCreateError("Could not create append list.");
@@ -93,16 +102,50 @@ export default function Home() {
     }
   };
 
-  const downloadCsv = (listTitle: string, rows: Array<{ name: string; emailId?: string; registerNo?: string; joiningTime: string }>) => {
+  const downloadCsv = (
+    listTitle: string,
+    listType: "nightslip" | "github" | "others",
+    rows: Array<{
+      name: string;
+      emailId?: string;
+      registerNo?: string;
+      githubUsername?: string;
+      input1?: string[];
+      joiningTime: string;
+    }>,
+  ) => {
+    const header =
+      listType === "github"
+        ? "name,emailid,register_no,github_username,joining_time"
+        : listType === "others"
+          ? "name,emailid,register_no,input_1,joining_time"
+          : "name,emailid,register_no,joining_time";
+
     const csvRows = [
-      "name,emailid,register_no,joining_time",
+      header,
       ...rows.map((person) =>
-        [
-          csvCell(person.name),
-          csvCell(person.emailId),
-          csvCell(person.registerNo),
-          csvCell(person.joiningTime),
-        ].join(","),
+        listType === "github"
+          ? [
+              csvCell(person.name),
+              csvCell(person.emailId),
+              csvCell(person.registerNo),
+              csvCell(person.githubUsername),
+              csvCell(person.joiningTime),
+            ].join(",")
+          : listType === "others"
+            ? [
+                csvCell(person.name),
+                csvCell(person.emailId),
+                csvCell(person.registerNo),
+                csvCell((person.input1 ?? []).join(" | ")),
+                csvCell(person.joiningTime),
+              ].join(",")
+            : [
+                csvCell(person.name),
+                csvCell(person.emailId),
+                csvCell(person.registerNo),
+                csvCell(person.joiningTime),
+              ].join(","),
       ),
     ];
 
@@ -137,18 +180,19 @@ export default function Home() {
         },
       });
 
-      downloadCsv(payload.listTitle, payload.rows);
+      downloadCsv(payload.listTitle, payload.listType, payload.rows);
     } finally {
       setExportingListId(null);
     }
   };
 
   return (
-    <main className="grid min-h-screen place-items-center px-6 py-16">
-      <section className="w-full max-w-2xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">
-          Append
-        </p>
+    <>
+      <main className="grid min-h-screen place-items-center px-6 py-16">
+        <section className="w-full max-w-2xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">
+            Append
+          </p>
 
         {isPending ? (
           <>
@@ -202,6 +246,9 @@ export default function Home() {
                       {list.title}
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">{list.description}</p>
+                    <p className="mt-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
+                      Type: {list.type}
+                    </p>
                     <p className="mt-1 text-xs text-slate-500">
                       Created on {new Date(list.createdAt).toLocaleDateString()}
                     </p>
@@ -243,55 +290,6 @@ export default function Home() {
               )}
             </div>
 
-            {showCreateModal ? (
-              <div className="inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
-                <div className="w-full max-w-lg rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl backdrop-blur">
-                  <h2 className="text-xl font-semibold text-slate-900">
-                    Create Append List
-                  </h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Enter a name and description for your new append list.
-                  </p>
-
-                  <div className="mt-5 space-y-3">
-                    <input
-                      value={newTitle}
-                      onChange={(event) => setNewTitle(event.target.value)}
-                      placeholder="Append list name"
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
-                    />
-                    <textarea
-                      value={newDescription}
-                      onChange={(event) => setNewDescription(event.target.value)}
-                      placeholder="Append list description"
-                      className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
-                    />
-                    {createError ? (
-                      <p className="text-sm font-medium text-red-600">{createError}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-5 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={handleAddAppendList}
-                      disabled={isCreating}
-                      className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isCreating ? "Creating..." : "Create"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCloseCreateModal}
-                      disabled={isCreating}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </>
         ) : (
           <>
@@ -306,7 +304,70 @@ export default function Home() {
             </div>
           </>
         )}
-      </section>
-    </main>
+        </section>
+      </main>
+      {showCreateModal && session?.user ? (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
+          <div className="w-full max-w-lg rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl backdrop-blur">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Create Append List
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Enter a name and description for your new append list.
+            </p>
+
+            <div className="mt-5 space-y-3">
+              <select
+                value={newListType}
+                onChange={(event) =>
+                  setNewListType(
+                    event.target.value as "nightslip" | "github" | "others",
+                  )
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
+              >
+                <option value="nightslip">nightslip</option>
+                <option value="github">github</option>
+                <option value="others">others</option>
+              </select>
+              <input
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                placeholder="Append list name"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
+              />
+              <textarea
+                value={newDescription}
+                onChange={(event) => setNewDescription(event.target.value)}
+                placeholder="Append list description"
+                className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
+              />
+              {createError ? (
+                <p className="text-sm font-medium text-red-600">{createError}</p>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={handleAddAppendList}
+                disabled={isCreating}
+                className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isCreating ? "Creating..." : "Create"}
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseCreateModal}
+                disabled={isCreating}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

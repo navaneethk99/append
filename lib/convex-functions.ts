@@ -25,6 +25,7 @@ export type AppendList = {
   id: string;
   title: string;
   description: string;
+  type: "nightslip" | "github" | "others";
   createdAt: number;
   updatedAt: number;
   listOwner: string;
@@ -46,6 +47,7 @@ export type ListDetail = {
     id: string;
     title: string;
     description: string;
+    type: "nightslip" | "github" | "others";
   };
   people: AppendPerson[];
   permissions: ListPermissions;
@@ -53,10 +55,13 @@ export type ListDetail = {
 
 export type ExportRows = {
   listTitle: string;
+  listType: "nightslip" | "github" | "others";
   rows: Array<{
     name: string;
     emailId?: string;
     registerNo?: string;
+    githubUsername?: string;
+    input1?: string[];
     joiningTime: string;
   }>;
 };
@@ -64,7 +69,12 @@ export type ExportRows = {
 export const convexFunctions = {
   getOwnedLists: query<{ ownerId: string }, AppendList[]>("appendLists:getOwnedLists"),
   createList: mutation<
-    { ownerId: string; title: string; description: string },
+    {
+      ownerId: string;
+      title: string;
+      description: string;
+      listType: "nightslip" | "github" | "others";
+    },
     AppendList
   >("appendLists:createList"),
   deleteList: mutation<{ listId: string; ownerId: string }, { success: boolean }>(
@@ -82,7 +92,14 @@ export const convexFunctions = {
     ListDetail
   >("appendLists:getListDetail"),
   joinList: mutation<
-    { listId: string; userId: string; name?: string; email?: string },
+    {
+      listId: string;
+      userId: string;
+      name?: string;
+      email?: string;
+      githubUsername?: string;
+      otherInputs?: string[];
+    },
     { person: AppendPerson }
   >("appendLists:joinList"),
   leaveList: mutation<
