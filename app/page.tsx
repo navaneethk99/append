@@ -1,23 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { authClient } from "@/lib/auth-client";
+import { convexFunctions, type AppendList } from "@/lib/convex-functions";
 
-type AppendList = {
-  id: string;
-  title: string;
-  description: string;
-  createdAt: string;
-  updatedAt: string;
-  listOwner: string;
-};
+const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
 
 export default function Home() {
   const { data: session, isPending } = authClient.useSession();
+  const convex = useConvex();
+  const createList = useMutation(convexFunctions.createList);
+  const deleteList = useMutation(convexFunctions.deleteList);
+  const lists = useQuery(
+    convexFunctions.getOwnedLists,
+    session?.user?.id ? { ownerId: session.user.id } : "skip",
+  );
+
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [lists, setLists] = useState<AppendList[]>([]);
   const [copiedListId, setCopiedListId] = useState<string | null>(null);
   const [deletingListId, setDeletingListId] = useState<string | null>(null);
   const [exportingListId, setExportingListId] = useState<string | null>(null);
@@ -25,28 +28,6 @@ export default function Home() {
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [createError, setCreateError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadLists = async () => {
-      if (!session?.user) {
-        setLists([]);
-        return;
-      }
-
-      const response = await fetch("/api/append-lists", {
-        method: "GET",
-      });
-
-      if (!response.ok) {
-        return;
-      }
-
-      const payload = (await response.json()) as { lists: AppendList[] };
-      setLists(payload.lists);
-    };
-
-    void loadLists();
-  }, [session?.user]);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -67,6 +48,10 @@ export default function Home() {
   };
 
   const handleAddAppendList = async () => {
+    if (!session?.user?.id) {
+      return;
+    }
+
     const title = newTitle.trim();
     const description = newDescription.trim();
 
@@ -77,26 +62,14 @@ export default function Home() {
 
     setIsCreating(true);
 
-    const response = await fetch("/api/append-lists", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ title, description }),
-    });
-
-    if (response.ok) {
-      const payload = (await response.json()) as { list: AppendList };
-      setLists((current) => [payload.list, ...current]);
+    try {
+      await createList({ ownerId: session.user.id, title, description });
       handleCloseCreateModal();
-    } else {
-      const payload = (await response.json().catch(() => ({}))) as {
-        error?: string;
-      };
-      setCreateError(payload.error ?? "Could not create append list.");
+    } catch {
+      setCreateError("Could not create append list.");
+    } finally {
+      setIsCreating(false);
     }
-
-    setIsCreating(false);
   };
 
   const handleCopyLink = async (listId: string) => {
@@ -107,42 +80,67 @@ export default function Home() {
   };
 
   const handleDeleteList = async (listId: string) => {
-    setDeletingListId(listId);
-
-    const response = await fetch(`/api/append-lists/${listId}`, {
-      method: "DELETE",
-    });
-
-    if (response.ok) {
-      setLists((current) => current.filter((list) => list.id !== listId));
-    }
-
-    setDeletingListId(null);
-  };
-
-  const handleExportCsv = async (list: AppendList) => {
-    setExportingListId(list.id);
-
-    const response = await fetch(`/api/append-lists/${list.id}/export`, {
-      method: "GET",
-    });
-
-    if (!response.ok) {
-      setExportingListId(null);
+    if (!session?.user?.id) {
       return;
     }
 
-    const blob = await response.blob();
+    setDeletingListId(listId);
+
+    try {
+      await deleteList({ listId, ownerId: session.user.id });
+    } finally {
+      setDeletingListId(null);
+    }
+  };
+
+  const downloadCsv = (listTitle: string, rows: Array<{ name: string; emailId?: string; registerNo?: string; joiningTime: string }>) => {
+    const csvRows = [
+      "name,emailid,register_no,joining_time",
+      ...rows.map((person) =>
+        [
+          csvCell(person.name),
+          csvCell(person.emailId),
+          csvCell(person.registerNo),
+          csvCell(person.joiningTime),
+        ].join(","),
+      ),
+    ];
+
+    const blob = new Blob([`${csvRows.join("\n")}\n`], {
+      type: "text/csv;charset=utf-8",
+    });
+
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${list.title.replace(/\s+/g, "-").toLowerCase()}-names.csv`;
+    anchor.download = `${listTitle.replace(/\s+/g, "-").toLowerCase()}-names.csv`;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
     URL.revokeObjectURL(url);
+  };
 
-    setExportingListId(null);
+  const handleExportCsv = async (list: AppendList) => {
+    if (!session?.user?.id) {
+      return;
+    }
+
+    setExportingListId(list.id);
+
+    try {
+      const payload = await convex.query(convexFunctions.getExportRows, {
+        listId: list.id,
+        viewer: {
+          id: session.user.id,
+          email: session.user.email ?? undefined,
+          name: session.user.name ?? undefined,
+        },
+      });
+
+      downloadCsv(payload.listTitle, payload.rows);
+    } finally {
+      setExportingListId(null);
+    }
   };
 
   return (
@@ -190,7 +188,9 @@ export default function Home() {
             </div>
 
             <div className="mt-8 space-y-3">
-              {lists.length === 0 ? (
+              {lists === undefined ? (
+                <p className="text-sm text-slate-600">Loading your append lists...</p>
+              ) : lists.length === 0 ? (
                 <p className="text-sm text-slate-600">No append lists yet.</p>
               ) : (
                 lists.map((list) => (
@@ -201,9 +201,7 @@ export default function Home() {
                     <h2 className="text-base font-semibold text-slate-900">
                       {list.title}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {list.description}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-600">{list.description}</p>
                     <p className="mt-1 text-xs text-slate-500">
                       Created on {new Date(list.createdAt).toLocaleDateString()}
                     </p>
@@ -246,7 +244,7 @@ export default function Home() {
             </div>
 
             {showCreateModal ? (
-              <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
+              <div className="inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
                 <div className="w-full max-w-lg rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl backdrop-blur">
                   <h2 className="text-xl font-semibold text-slate-900">
                     Create Append List
@@ -264,16 +262,12 @@ export default function Home() {
                     />
                     <textarea
                       value={newDescription}
-                      onChange={(event) =>
-                        setNewDescription(event.target.value)
-                      }
+                      onChange={(event) => setNewDescription(event.target.value)}
                       placeholder="Append list description"
                       className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
                     />
                     {createError ? (
-                      <p className="text-sm font-medium text-red-600">
-                        {createError}
-                      </p>
+                      <p className="text-sm font-medium text-red-600">{createError}</p>
                     ) : null}
                   </div>
 

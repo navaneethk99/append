@@ -1,154 +1,142 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useConvex, useMutation, useQuery } from "convex/react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { authClient } from "@/lib/auth-client";
+import { convexFunctions } from "@/lib/convex-functions";
 
-type AppendList = {
-  id: string;
-  title: string;
-  description: string;
-};
-
-type AppendPerson = {
-  id: string;
-  name: string;
-};
-
-type ListPermissions = {
-  isOwner: boolean;
-  canDownload: boolean;
-};
+const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
 
 export default function JoinAppendListPage() {
   const params = useParams<{ id: string }>();
   const listId = params?.id;
   const { data: session, isPending } = authClient.useSession();
-  const [list, setList] = useState<AppendList | null>(null);
-  const [people, setPeople] = useState<AppendPerson[]>([]);
+  const convex = useConvex();
+  const joinList = useMutation(convexFunctions.joinList);
+  const leaveList = useMutation(convexFunctions.leaveList);
+
+  const detail = useQuery(
+    convexFunctions.getListDetail,
+    listId
+      ? {
+          listId,
+          viewer: session?.user
+            ? {
+                id: session.user.id,
+                email: session.user.email ?? undefined,
+                name: session.user.name ?? undefined,
+              }
+            : undefined,
+        }
+      : "skip",
+  );
+
   const [isJoining, setIsJoining] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [permissions, setPermissions] = useState<ListPermissions>({
-    isOwner: false,
-    canDownload: false,
-  });
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!listId) {
-      return;
-    }
-
-    const load = async () => {
-      const response = await fetch(`/api/append-lists/${listId}`);
-
-      if (!response.ok) {
-        setError("This append list could not be found.");
-        return;
-      }
-
-      const payload = (await response.json()) as {
-        list: AppendList;
-        people: AppendPerson[];
-        permissions?: ListPermissions;
-      };
-
-      setError(null);
-      setList(payload.list);
-      setPeople(payload.people);
-      setPermissions(
-        payload.permissions ?? { isOwner: false, canDownload: false },
-      );
-    };
-
-    void load();
-  }, [listId, session?.user?.id]);
 
   const handleJoin = async () => {
     setError(null);
+
+    if (!listId || !session?.user) {
+      setError("Please sign in to join this append list.");
+      return;
+    }
+
     setIsJoining(true);
 
-    if (!listId) {
+    try {
+      await joinList({
+        listId,
+        userId: session.user.id,
+        name: session.user.name ?? undefined,
+        email: session.user.email ?? undefined,
+      });
+    } catch {
+      setError("Could not append your name. Please try again.");
+    } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    setError(null);
+
+    if (!listId || !session?.user) {
+      setError("Please sign in to leave this append list.");
       return;
     }
 
-    const response = await fetch(`/api/append-lists/${listId}/join`, {
-      method: "POST",
-    });
+    setIsLeaving(true);
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        setError("Please sign in to join this append list.");
-      } else {
-        setError("Could not append your name. Please try again.");
-      }
-      setIsJoining(false);
-      return;
+    try {
+      await leaveList({
+        listId,
+        userId: session.user.id,
+        name: session.user.name ?? undefined,
+        email: session.user.email ?? undefined,
+      });
+    } catch {
+      setError("Could not remove your name. Please try again.");
+    } finally {
+      setIsLeaving(false);
     }
-
-    const payload = (await response.json()) as { person: AppendPerson };
-    setPeople((current) => {
-      if (current.some((person) => person.id === payload.person.id)) {
-        return current;
-      }
-
-      return [...current, payload.person];
-    });
-
-    const refreshResponse = await fetch(`/api/append-lists/${listId}`);
-    if (refreshResponse.ok) {
-      const refreshPayload = (await refreshResponse.json()) as {
-        list: AppendList;
-        people: AppendPerson[];
-        permissions?: ListPermissions;
-      };
-      setError(null);
-      setList(refreshPayload.list);
-      setPeople(refreshPayload.people);
-      setPermissions(
-        refreshPayload.permissions ?? { isOwner: false, canDownload: false },
-      );
-    }
-    setIsJoining(false);
   };
 
   const handleExportCsv = async () => {
-    if (!listId || !list) {
+    if (!listId || !detail?.list || !session?.user) {
       return;
     }
 
     setError(null);
     setIsExporting(true);
 
-    const response = await fetch(`/api/append-lists/${listId}/export`, {
-      method: "GET",
-    });
+    try {
+      const payload = await convex.query(convexFunctions.getExportRows, {
+        listId,
+        viewer: {
+          id: session.user.id,
+          email: session.user.email ?? undefined,
+          name: session.user.name ?? undefined,
+        },
+      });
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        setError("Please sign in to download this list.");
-      } else if (response.status === 403) {
-        setError("You are not allowed to download this list.");
-      } else {
-        setError("Could not download list. Please try again.");
-      }
+      const csvRows = [
+        "name,emailid,register_no,joining_time",
+        ...payload.rows.map((person) =>
+          [
+            csvCell(person.name),
+            csvCell(person.emailId),
+            csvCell(person.registerNo),
+            csvCell(person.joiningTime),
+          ].join(","),
+        ),
+      ];
+
+      const blob = new Blob([`${csvRows.join("\n")}\n`], {
+        type: "text/csv;charset=utf-8",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${payload.listTitle
+        .replace(/\s+/g, "-")
+        .toLowerCase()}-names.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError("Could not download list. Please try again.");
+    } finally {
       setIsExporting(false);
-      return;
     }
-
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${list.title.replace(/\s+/g, "-").toLowerCase()}-names.csv`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
-    setIsExporting(false);
   };
 
   return (
@@ -161,14 +149,19 @@ export default function JoinAppendListPage() {
           Go Back
         </Link>
         {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-        {!list ? (
+
+        {detail === undefined ? (
           <p className="mt-4 text-sm text-slate-600">Loading append list...</p>
+        ) : !detail ? (
+          <p className="mt-4 text-sm text-slate-600">
+            This append list could not be found.
+          </p>
         ) : (
           <>
             <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-              {list.title}
+              {detail.list.title}
             </h1>
-            <p className="mt-2 text-sm text-slate-600">{list.description}</p>
+            <p className="mt-2 text-sm text-slate-600">{detail.list.description}</p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               {isPending ? (
@@ -177,13 +170,19 @@ export default function JoinAppendListPage() {
                 <>
                   <button
                     type="button"
-                    onClick={handleJoin}
-                    disabled={isJoining}
+                    onClick={detail.permissions.hasJoined ? handleLeave : handleJoin}
+                    disabled={isJoining || isLeaving}
                     className="rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isJoining ? "Joining..." : "Join Append List"}
+                    {detail.permissions.hasJoined
+                      ? isLeaving
+                        ? "Leaving..."
+                        : "Leave Append List"
+                      : isJoining
+                        ? "Joining..."
+                        : "Join Append List"}
                   </button>
-                  {permissions.canDownload ? (
+                  {detail.permissions.canDownload ? (
                     <button
                       type="button"
                       onClick={handleExportCsv}
@@ -208,10 +207,10 @@ export default function JoinAppendListPage() {
               <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700">
                 People in this list
               </h2>
-              {people.length === 0 ? (
+              {detail.people.length === 0 ? (
                 <p className="text-sm text-slate-600">No names added yet.</p>
               ) : (
-                people.map((person) => (
+                detail.people.map((person) => (
                   <p
                     key={person.id}
                     className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
