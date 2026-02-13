@@ -1,65 +1,276 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import { GoogleSignInButton } from "@/components/google-sign-in-button";
+import { authClient } from "@/lib/auth-client";
+
+type AppendList = {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  listOwner: string;
+};
 
 export default function Home() {
+  const { data: session, isPending } = authClient.useSession();
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [lists, setLists] = useState<AppendList[]>([]);
+  const [copiedListId, setCopiedListId] = useState<string | null>(null);
+  const [deletingListId, setDeletingListId] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadLists = async () => {
+      if (!session?.user) {
+        setLists([]);
+        return;
+      }
+
+      const response = await fetch("/api/append-lists", {
+        method: "GET",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as { lists: AppendList[] };
+      setLists(payload.lists);
+    };
+
+    void loadLists();
+  }, [session?.user]);
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    await authClient.signOut();
+    window.location.reload();
+  };
+
+  const handleOpenCreateModal = () => {
+    setCreateError(null);
+    setShowCreateModal(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setNewTitle("");
+    setNewDescription("");
+    setCreateError(null);
+  };
+
+  const handleAddAppendList = async () => {
+    const title = newTitle.trim();
+    const description = newDescription.trim();
+
+    if (!title || !description) {
+      setCreateError("Both name and description are required.");
+      return;
+    }
+
+    setIsCreating(true);
+
+    const response = await fetch("/api/append-lists", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ title, description }),
+    });
+
+    if (response.ok) {
+      const payload = (await response.json()) as { list: AppendList };
+      setLists((current) => [payload.list, ...current]);
+      handleCloseCreateModal();
+    } else {
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      setCreateError(payload.error ?? "Could not create append list.");
+    }
+
+    setIsCreating(false);
+  };
+
+  const handleCopyLink = async (listId: string) => {
+    const url = `${window.location.origin}/append-list/${listId}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedListId(listId);
+    setTimeout(() => setCopiedListId(null), 1500);
+  };
+
+  const handleDeleteList = async (listId: string) => {
+    setDeletingListId(listId);
+
+    const response = await fetch(`/api/append-lists/${listId}`, {
+      method: "DELETE",
+    });
+
+    if (response.ok) {
+      setLists((current) => current.filter((list) => list.id !== listId));
+    }
+
+    setDeletingListId(null);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main className="grid min-h-screen place-items-center px-6 py-16">
+      <section className="w-full max-w-2xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
+        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-sky-700">
+          Append
+        </p>
+
+        {isPending ? (
+          <>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+              Checking session
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Please wait while we verify your sign-in.
+            </p>
+          </>
+        ) : session?.user ? (
+          <>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+              Welcome back, {session.user.name}
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              You are signed in as {session.user.email}.
+            </p>
+
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleOpenCreateModal}
+                disabled={isCreating}
+                className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isCreating ? "Creating..." : "Add Append List"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={isSigningOut}
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSigningOut ? "Signing out..." : "Sign out"}
+              </button>
+            </div>
+
+            <div className="mt-8 space-y-3">
+              {lists.length === 0 ? (
+                <p className="text-sm text-slate-600">No append lists yet.</p>
+              ) : (
+                lists.map((list) => (
+                  <article
+                    key={list.id}
+                    className="rounded-xl border border-slate-200 bg-white p-4"
+                  >
+                    <h2 className="text-base font-semibold text-slate-900">
+                      {list.title}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">{list.description}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Created on {new Date(list.createdAt).toLocaleDateString()}
+                    </p>
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(list.id)}
+                        className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                      >
+                        {copiedListId === list.id ? "Copied" : "Click to Copy"}
+                      </button>
+                      <a
+                        href={`/append-list/${list.id}`}
+                        className="rounded-lg bg-sky-600 px-3 py-2 text-center text-sm font-semibold text-white transition hover:bg-sky-700"
+                      >
+                        Join Append List
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteList(list.id)}
+                        disabled={deletingListId === list.id}
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {deletingListId === list.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+
+            {showCreateModal ? (
+              <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
+                <div className="w-full max-w-lg rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl backdrop-blur">
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Create Append List
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Enter a name and description for your new append list.
+                  </p>
+
+                  <div className="mt-5 space-y-3">
+                    <input
+                      value={newTitle}
+                      onChange={(event) => setNewTitle(event.target.value)}
+                      placeholder="Append list name"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
+                    />
+                    <textarea
+                      value={newDescription}
+                      onChange={(event) => setNewDescription(event.target.value)}
+                      placeholder="Append list description"
+                      className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
+                    />
+                    {createError ? (
+                      <p className="text-sm font-medium text-red-600">{createError}</p>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-5 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={handleAddAppendList}
+                      disabled={isCreating}
+                      className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      {isCreating ? "Creating..." : "Create"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCloseCreateModal}
+                      disabled={isCreating}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">
+              Create your account
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Sign up in one click with Google.
+            </p>
+            <div className="mt-8">
+              <GoogleSignInButton />
+            </div>
+          </>
+        )}
+      </section>
+    </main>
   );
 }
