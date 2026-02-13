@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -10,6 +10,36 @@ import { convexFunctions } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
+
+const normalizeSearchValue = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const tokenizeSearch = (query: string) =>
+  normalizeSearchValue(query).split(/\s+/).filter(Boolean);
+
+const buildSearchKey = (parts: Array<string | undefined>) =>
+  normalizeSearchValue(parts.filter(Boolean).join(" ")).replace(/\s+/g, "");
+
+const isSubsequence = (needle: string, haystack: string) => {
+  if (!needle) {
+    return true;
+  }
+
+  let needleIndex = 0;
+  for (let i = 0; i < haystack.length; i += 1) {
+    if (haystack[i] === needle[needleIndex]) {
+      needleIndex += 1;
+      if (needleIndex === needle.length) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
 
 export default function JoinAppendListPage() {
   const params = useParams<{ id: string }>();
@@ -48,6 +78,7 @@ export default function JoinAppendListPage() {
   const [autoJoinGithubRequested, setAutoJoinGithubRequested] = useState(false);
   const [hasAttemptedAutoJoinGithub, setHasAttemptedAutoJoinGithub] =
     useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleJoin = useCallback(
@@ -134,10 +165,7 @@ export default function JoinAppendListPage() {
     return () => {
       isMounted = false;
     };
-  }, [
-    detail?.list.type,
-    session?.user?.id,
-  ]);
+  }, [detail?.list.type, session?.user?.id]);
 
   useEffect(() => {
     if (
@@ -160,7 +188,9 @@ export default function JoinAppendListPage() {
         });
 
         if (response.ok) {
-          const payload = (await response.json()) as { username?: string | null };
+          const payload = (await response.json()) as {
+            username?: string | null;
+          };
           const username = payload.username?.trim();
           if (username) {
             const saveResponse = await fetch("/api/github/profile", {
@@ -431,191 +461,294 @@ export default function JoinAppendListPage() {
     }
   };
 
+  const peopleIndex = useMemo(() => {
+    if (!detail?.people) {
+      return [];
+    }
+
+    return detail.people.map((person) => {
+      const searchKey = buildSearchKey([
+        person.name,
+        person.registerNo,
+        person.githubUsername,
+      ]);
+
+      return {
+        ...person,
+        displayName: person.githubUsername
+          ? `${person.name} (${person.githubUsername})`
+          : person.name,
+        searchKey,
+      };
+    });
+  }, [detail?.people]);
+
+  const filteredPeople = useMemo(() => {
+    if (peopleIndex.length === 0) {
+      return [];
+    }
+
+    const tokens = tokenizeSearch(searchQuery);
+    if (tokens.length === 0) {
+      return peopleIndex;
+    }
+
+    return peopleIndex.filter((person) =>
+      tokens.every((token) => isSubsequence(token, person.searchKey)),
+    );
+  }, [peopleIndex, searchQuery]);
+
   return (
     <>
-      <main className="grid min-h-screen place-items-center px-6 py-16">
-        <section className="w-full max-w-xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
-        <Link
-          href="/"
-          className="inline-flex rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          Go Back
-        </Link>
-        {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+      <main className="acm-bg-dot-grid relative min-h-screen overflow-hidden px-6 py-12">
+        <div className="acm-glow-ball left-[-60px] top-20 bg-[#F95F4A]" />
+        <div className="acm-glow-ball bottom-[-140px] right-[-40px] bg-[#FF007A]" />
 
-        {detail === undefined ? (
-          <p className="mt-4 text-sm text-slate-600">Loading append list...</p>
-        ) : !detail ? (
-          <p className="mt-4 text-sm text-slate-600">
-            This append list could not be found.
-          </p>
-        ) : (
-          <>
-            <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900">
-              {detail.list.title}
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">{detail.list.description}</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-500">
-              Type: {detail.list.type}
-            </p>
+        <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col gap-8">
+          <header className="flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-2">
+              <p className="acm-label">Append List</p>
+              <h1 className="acm-heading-display text-3xl md:text-4xl">
+                Feed
+              </h1>
+              <p className="text-sm text-white/70">
+                Join, search, and export append lists from the live control
+                surface.
+              </p>
+            </div>
+            <Link href="/" className="acm-btn-ghost text-xs">
+              Go Back
+            </Link>
+          </header>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              {isPending ? (
-                <p className="text-sm text-slate-600">Checking your session...</p>
-              ) : session?.user ? (
+          <section className="acm-card">
+            <div className="relative z-10 space-y-6">
+              {error ? (
+                <p className="text-sm font-medium text-rose-300">{error}</p>
+              ) : null}
+
+              {detail === undefined ? (
+                <p className="text-sm text-white/70">Loading append list...</p>
+              ) : !detail ? (
+                <p className="text-sm text-white/70">
+                  This append list could not be found.
+                </p>
+              ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={detail.permissions.hasJoined ? handleLeave : handleJoinClick}
-                    disabled={isJoining || isLeaving}
-                    className="rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {detail.permissions.hasJoined
-                      ? isLeaving
-                        ? "Leaving..."
-                        : "Leave Append List"
-                      : isJoining
-                        ? "Joining..."
-                        : "Join Append List"}
-                  </button>
-                  {detail.permissions.canDownload ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleExportCsv}
-                        disabled={isExporting}
-                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {isExporting ? "Downloading..." : "Download List CSV"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCopyList}
-                        disabled={isCopying}
-                        className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {isCopying
-                          ? "Copying..."
-                          : copySuccess
-                            ? "Copied"
-                            : "Copy List"}
-                      </button>
-                    </>
-                  ) : null}
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h2 className="acm-heading text-lg text-white">
+                        {detail.list.title}
+                      </h2>
+                      <p className="mt-2 text-sm text-white/70">
+                        {detail.list.description}
+                      </p>
+                    </div>
+                    <span className="acm-pill">Type {detail.list.type}</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    {isPending ? (
+                      <p className="text-sm text-white/70">
+                        Checking your session...
+                      </p>
+                    ) : session?.user ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={
+                            detail.permissions.hasJoined
+                              ? handleLeave
+                              : handleJoinClick
+                          }
+                          disabled={isJoining || isLeaving}
+                          className="acm-btn-primary text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                        >
+                          {detail.permissions.hasJoined
+                            ? isLeaving
+                              ? "Leaving..."
+                              : "Leave Append List"
+                            : isJoining
+                              ? "Joining..."
+                              : "Join Append List"}
+                        </button>
+                        {detail.permissions.canDownload ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleExportCsv}
+                              disabled={isExporting}
+                              className="acm-btn-ghost text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {isExporting
+                                ? "Downloading..."
+                                : "Download List CSV"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCopyList}
+                              disabled={isCopying}
+                              className="acm-btn-ghost text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {isCopying
+                                ? "Copying..."
+                                : copySuccess
+                                  ? "Copied"
+                                  : "Copy List"}
+                            </button>
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-white/70">
+                          Sign in first, then click join append list.
+                        </p>
+                        <GoogleSignInButton />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <h3 className="acm-heading text-sm">
+                        People in this list
+                      </h3>
+                      <span className="acm-label">
+                        {detail.people.length} entries
+                      </span>
+                    </div>
+
+                    {detail.people.length > 0 ? (
+                      <div className="space-y-2">
+                        <input
+                          value={searchQuery}
+                          onChange={(event) =>
+                            setSearchQuery(event.target.value)
+                          }
+                          placeholder="Search name, surname, reg no, GitHub username"
+                          className="acm-input text-sm"
+                        />
+                        <p className="text-xs text-white/50">
+                          Showing {filteredPeople.length} of{" "}
+                          {detail.people.length}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    {detail.people.length === 0 ? (
+                      <p className="text-sm text-white/70">
+                        No names added yet.
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {filteredPeople.map((person) => (
+                          <p
+                            key={person.id}
+                            className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/70"
+                          >
+                            {person.displayName}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-slate-600">
-                    Sign in first, then click join append list.
-                  </p>
-                  <GoogleSignInButton />
-                </div>
               )}
             </div>
-
-            <div className="mt-8 space-y-2">
-              <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700">
-                People in this list
-              </h2>
-              {detail.people.length === 0 ? (
-                <p className="text-sm text-slate-600">No names added yet.</p>
-              ) : (
-                detail.people.map((person) => (
-                  <p
-                    key={person.id}
-                    className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
-                  >
-                    {person.name}
-                  </p>
-                ))
-              )}
-            </div>
-          </>
-        )}
-        </section>
+          </section>
+        </div>
       </main>
-      {showJoinModal && detail?.list && !detail.permissions.hasJoined ? (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/35 px-4">
-          <div className="w-full max-w-lg rounded-2xl border border-white/40 bg-white/95 p-6 shadow-2xl backdrop-blur">
-            <h2 className="text-xl font-semibold text-slate-900">
-              Join Append List
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {detail.list.type === "github"
-                ? "Connect GitHub once. Your GitHub username will be saved and reused."
-                : "Add one or more input values to join this list."}
-            </p>
 
-            <div className="mt-5 space-y-3">
-              {detail.list.type === "github" ? (
-                <>
-                  {githubUsername ? (
-                    <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                      Connected GitHub username: <strong>{githubUsername}</strong>
-                    </p>
-                  ) : (
+      {showJoinModal && detail?.list && !detail.permissions.hasJoined ? (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 px-4">
+          <div className="acm-card w-full max-w-lg">
+            <div className="relative z-10 space-y-5">
+              <div>
+                <h2 className="acm-heading text-lg">Join Append List</h2>
+                <p className="text-sm text-white/70">
+                  {detail.list.type === "github"
+                    ? "Connect GitHub once. Your GitHub username will be saved and reused."
+                    : "Add one or more input values to join this list."}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {detail.list.type === "github" ? (
+                  <>
+                    {githubUsername ? (
+                      <p className="rounded-xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
+                        Connected GitHub username:{" "}
+                        <strong>{githubUsername}</strong>
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConnectGithub}
+                        disabled={isConnectingGithub}
+                        className="acm-btn-ghost w-full text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isConnectingGithub
+                          ? "Redirecting to GitHub..."
+                          : "Continue with GitHub"}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {otherInputs.map((value, index) => (
+                      <input
+                        key={`${index}`}
+                        value={value}
+                        onChange={(event) => {
+                          setOtherInputs((current) => {
+                            const next = current.slice();
+                            next[index] = event.target.value;
+                            return next;
+                          });
+                        }}
+                        placeholder={`Input ${index + 1}`}
+                        className="acm-input text-sm"
+                      />
+                    ))}
                     <button
                       type="button"
-                      onClick={handleConnectGithub}
-                      disabled={isConnectingGithub}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                      onClick={() =>
+                        setOtherInputs((current) => [...current, ""])
+                      }
+                      className="acm-btn-ghost text-xs"
                     >
-                      {isConnectingGithub
-                        ? "Redirecting to GitHub..."
-                        : "Continue with GitHub"}
+                      + Add Input
                     </button>
-                  )}
-                </>
-              ) : (
-                <>
-                  {otherInputs.map((value, index) => (
-                    <input
-                      key={`${index}`}
-                      value={value}
-                      onChange={(event) => {
-                        setOtherInputs((current) => {
-                          const next = current.slice();
-                          next[index] = event.target.value;
-                          return next;
-                        });
-                      }}
-                      placeholder={`Input ${index + 1}`}
-                      className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
-                    />
-                  ))}
+                  </>
+                )}
+                {joinModalError ? (
+                  <p className="text-sm font-medium text-rose-300">
+                    {joinModalError}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                {detail.list.type === "others" ? (
                   <button
                     type="button"
-                    onClick={() => setOtherInputs((current) => [...current, ""])}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                    onClick={handleConfirmJoin}
+                    disabled={isJoining || isConnectingGithub}
+                    className="acm-btn-primary flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    + Add Input
+                    {isJoining ? "Joining..." : "Join"}
                   </button>
-                </>
-              )}
-              {joinModalError ? (
-                <p className="text-sm font-medium text-red-600">{joinModalError}</p>
-              ) : null}
-            </div>
-
-            <div className="mt-5 flex gap-3">
-              {detail.list.type === "others" ? (
+                ) : null}
                 <button
                   type="button"
-                  onClick={handleConfirmJoin}
-                  disabled={isJoining || isConnectingGithub}
-                  className="w-full rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={handleCloseJoinModal}
+                  disabled={isJoining}
+                  className="acm-btn-ghost flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {isJoining ? "Joining..." : "Join"}
+                  Cancel
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={handleCloseJoinModal}
-                disabled={isJoining}
-                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-              >
-                Cancel
-              </button>
+              </div>
             </div>
           </div>
         </div>
