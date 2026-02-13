@@ -1,5 +1,4 @@
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
 import { betterAuth } from "better-auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -21,23 +20,6 @@ if (!googleClientId || !googleClientSecret) {
   throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be set");
 }
 
-const allowedEmailDomain = "vitstudent.ac.in";
-
-const assertAllowedEmailDomain = (email?: string | null) => {
-  if (!email) {
-    throw new APIError("BAD_REQUEST", {
-      message: "Email is required",
-    });
-  }
-
-  const domain = email.toLowerCase().split("@")[1];
-  if (domain !== allowedEmailDomain) {
-    throw new APIError("FORBIDDEN", {
-      message: `Only ${allowedEmailDomain} email accounts are allowed`,
-    });
-  }
-};
-
 export const auth = betterAuth({
   secret,
   baseURL,
@@ -49,22 +31,9 @@ export const auth = betterAuth({
     google: {
       clientId: googleClientId,
       clientSecret: googleClientSecret,
-    },
-  },
-  databaseHooks: {
-    user: {
-      create: {
-        before: async (user) => {
-          assertAllowedEmailDomain(user.email);
-        },
-      },
-      update: {
-        before: async (user) => {
-          if ("email" in user && user.email) {
-            assertAllowedEmailDomain(String(user.email));
-          }
-        },
-      },
+      hd: "vitstudent.ac.in",
+      accessType: "offline",
+      prompt: "select_account consent",
     },
   },
 });
