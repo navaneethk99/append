@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useConvex, useMutation, useQuery } from "convex/react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { authClient } from "@/lib/auth-client";
@@ -8,7 +8,6 @@ import { convexFunctions, type AppendList } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
-
 export default function Home() {
   const { data: session, isPending } = authClient.useSession();
   const convex = useConvex();
@@ -31,6 +30,75 @@ export default function Home() {
     "nightslip" | "github" | "others"
   >("nightslip");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [showNotificationComposer, setShowNotificationComposer] =
+    useState(false);
+
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [notificationTitle, setNotificationTitle] = useState("");
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [notificationError, setNotificationError] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      setViewerId(`user:${session.user.id}`);
+    } else {
+      setViewerId(null);
+    }
+  }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    if (showNotificationComposer) {
+      const previous = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = previous;
+      };
+    }
+
+    return;
+  }, [showNotificationComposer]);
+
+  const notificationState = useQuery(
+    convexFunctions.getNotificationState,
+    viewerId && session?.user
+      ? {
+          viewerId,
+          viewerEmail: session?.user?.email ?? undefined,
+        }
+      : "skip",
+  );
+
+  const isAdmin = notificationState?.isAdmin ?? false;
+  const notifications = notificationState?.notifications ?? [];
+  const acknowledgeNotification = useMutation(
+    convexFunctions.acknowledgeNotification,
+  );
+  const createNotification = useMutation(convexFunctions.createNotification);
+
+  const canSendNotification = useMemo(
+    () =>
+      Boolean(
+        isAdmin &&
+          notificationTitle.trim() &&
+          notificationMessage.trim() &&
+          viewerId &&
+          session?.user?.email,
+      ),
+    [
+      isAdmin,
+      notificationTitle,
+      notificationMessage,
+      viewerId,
+      session?.user?.email,
+    ],
+  );
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -186,6 +254,51 @@ export default function Home() {
     }
   };
 
+  const handleAcknowledgeNotification = async (notificationId: string) => {
+    if (!viewerId) {
+      return;
+    }
+
+    await acknowledgeNotification({ notificationId, viewerId });
+  };
+
+  const handleSendNotification = async () => {
+    if (!viewerId || !session?.user?.email) {
+      return;
+    }
+
+    const trimmedTitle = notificationTitle.trim();
+    const trimmedMessage = notificationMessage.trim();
+    if (!trimmedTitle) {
+      setNotificationError("Add a title before sending.");
+      return;
+    }
+
+    if (!trimmedMessage) {
+      setNotificationError("Add a message before sending.");
+      return;
+    }
+
+    setIsSendingNotification(true);
+    setNotificationError(null);
+
+    try {
+      await createNotification({
+        viewerId,
+        viewerEmail: session.user.email,
+        title: trimmedTitle,
+        message: trimmedMessage,
+      });
+      setNotificationTitle("");
+      setNotificationMessage("");
+      setShowNotificationComposer(false);
+    } catch {
+      setNotificationError("Could not send notification.");
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
+
   return (
     <>
       <main className="acm-bg-dot-grid relative min-h-screen overflow-hidden px-6 py-12">
@@ -197,7 +310,7 @@ export default function Home() {
             <div className="max-w-2xl space-y-3">
               {/*<p className="acm-label">ACM-VIT</p>*/}
               <h1 className="acm-heading-display text-4xl md:text-5xl">
-                navappends
+                acmtwo
               </h1>
               <p className="acm-text-body text-sm text-white/70">
                 Spin up append lists, invite contributors, and keep the feed
@@ -252,75 +365,110 @@ export default function Home() {
                         <p className="text-sm text-white/70">
                           No append lists yet.
                         </p>
-                        <button
-                          type="button"
-                          onClick={handleOpenCreateModal}
-                          disabled={isCreating}
-                          className="acm-btn-primary text-xs disabled:cursor-not-allowed disabled:opacity-70"
-                        >
-                          {isCreating ? "Creating..." : "Create Append List"}
-                        </button>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={handleOpenCreateModal}
+                            disabled={isCreating}
+                            className="acm-btn-primary text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isCreating ? "Creating..." : "Create Append List"}
+                          </button>
+                          {isAdmin ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowNotificationComposer(true)}
+                              className="acm-btn-ghost text-xs"
+                            >
+                              Create Notification
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     ) : (
-                      lists.map((list) => (
-                        <article
-                          key={list.id}
-                          className="acm-glass rounded-2xl p-4"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <h3 className="text-base font-semibold text-white">
-                                {list.title}
-                              </h3>
-                              <p className="mt-1 text-sm text-white/60">
-                                {list.description}
-                              </p>
-                            </div>
-                            <span className="acm-pill">Type {list.type}</span>
-                          </div>
-                          <p className="mt-2 text-xs text-white/50">
-                            Created on{" "}
-                            {new Date(list.createdAt).toLocaleDateString()}
-                          </p>
-                          <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={handleOpenCreateModal}
+                            disabled={isCreating}
+                            className="acm-btn-primary text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                          >
+                            {isCreating ? "Creating..." : "Create Append List"}
+                          </button>
+                          {isAdmin ? (
                             <button
                               type="button"
-                              onClick={() => handleCopyLink(list.id)}
-                              className="acm-btn-ghost text-[0.65rem]"
+                              onClick={() => setShowNotificationComposer(true)}
+                              className="acm-btn-ghost text-xs"
                             >
-                              {copiedListId === list.id
-                                ? "Copied"
-                                : "Copy Link"}
+                              Create Notification
                             </button>
+                          ) : null}
+                        </div>
+                        {lists.map((list) => (
+                          <article
+                            key={list.id}
+                            className="acm-glass relative rounded-2xl p-4"
+                          >
                             <a
                               href={`/append-list/${list.id}`}
-                              className="acm-btn-primary text-[0.65rem]"
-                            >
-                              Load Append List
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => handleExportCsv(list)}
-                              disabled={exportingListId === list.id}
-                              className="acm-btn-ghost text-[0.65rem] disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {exportingListId === list.id
-                                ? "Exporting..."
-                                : "Export CSV"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteList(list.id)}
-                              disabled={deletingListId === list.id}
-                              className="acm-btn-ghost acm-btn-danger text-[0.65rem] disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {deletingListId === list.id
-                                ? "Deleting..."
-                                : "Delete"}
-                            </button>
-                          </div>
-                        </article>
-                      ))
+                              aria-label={`Open append list ${list.title}`}
+                              className="absolute inset-0 rounded-2xl acm-label-hover"
+                            />
+                            <div className="pointer-events-none relative z-10">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                  <h3 className="text-base font-semibold text-white">
+                                    {list.title}
+                                  </h3>
+                                  <p className="mt-1 text-sm text-white/60">
+                                    {list.description}
+                                  </p>
+                                </div>
+                                <span className="acm-pill">
+                                  Type {list.type}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs text-white/50">
+                                Created on{" "}
+                                {new Date(list.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="relative z-10 mt-3 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleCopyLink(list.id)}
+                                className="acm-btn-ghost text-[0.65rem]"
+                              >
+                                {copiedListId === list.id
+                                  ? "Copied"
+                                  : "Copy Link"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExportCsv(list)}
+                                disabled={exportingListId === list.id}
+                                className="acm-btn-ghost text-[0.65rem] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {exportingListId === list.id
+                                  ? "Exporting..."
+                                  : "Export CSV"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteList(list.id)}
+                                disabled={deletingListId === list.id}
+                                className="acm-btn-ghost acm-btn-danger text-[0.65rem] disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {deletingListId === list.id
+                                  ? "Deleting..."
+                                  : "Delete"}
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -380,6 +528,103 @@ export default function Home() {
           </div>
         </div>
       </main>
+      {showNotificationComposer && isAdmin ? (
+        <div className="fixed inset-0 z-[60] grid place-items-center p-6">
+          <div
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowNotificationComposer(false)}
+          />
+          <div
+            className="relative z-[1] w-full max-w-xl rounded-3xl border border-[#F95F4A66] bg-[#0b0a0a]/95 p-6 shadow-[0_30px_60px_rgba(0,0,0,0.55)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="acm-label text-xs">Create notification</p>
+              <button
+                type="button"
+                onClick={() => setShowNotificationComposer(false)}
+                className="acm-btn-ghost text-[0.65rem]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3 space-y-2">
+              <input
+                value={notificationTitle}
+                onChange={(event) => setNotificationTitle(event.target.value)}
+                placeholder="Notification title"
+                className="acm-input text-sm"
+              />
+              <textarea
+                value={notificationMessage}
+                onChange={(event) =>
+                  setNotificationMessage(event.target.value)
+                }
+                placeholder="Notification details..."
+                className="acm-input acm-notification-input text-sm"
+                rows={4}
+              />
+              {notificationError ? (
+                <p className="text-xs font-medium text-rose-300">
+                  {notificationError}
+                </p>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleSendNotification}
+                disabled={!canSendNotification || isSendingNotification}
+                className="acm-btn-primary w-full text-xs disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isSendingNotification ? "Sending..." : "Send notification"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {session?.user && notifications.length ? (
+        <aside className="acm-notification-shell">
+          {notifications
+            .filter(
+              (notification) =>
+                notification.createdByEmail !== session?.user?.email,
+            )
+            .map((notification) => (
+              <div
+                key={notification.id}
+                className="acm-notification-card animate-acm-slide-up"
+              >
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {notification.title}
+                    </p>
+                    <p className="text-sm text-white/80">
+                      {notification.message}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-white/60">
+                    <span>
+                      {new Date(notification.createdAt).toLocaleString()}
+                    </span>
+                    {notification.createdByEmail ? (
+                      <span>From {notification.createdByEmail}</span>
+                    ) : null}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleAcknowledgeNotification(notification.id)
+                  }
+                  className="acm-btn-ghost text-[0.7rem]"
+                >
+                  Acknowledge
+                </button>
+              </div>
+            ))}
+        </aside>
+      ) : null}
 
       {showCreateModal && session?.user ? (
         <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 px-4">

@@ -50,4 +50,19 @@ export default defineSchema({
     .index("by_list", ["appendListId"])
     .index("by_list_email", ["appendListId", "emailId"])
     .index("by_list_name", ["appendListId", "name"]),
+
+  notifications: defineTable({
+    title: v.string(),
+    message: v.string(),
+    createdAt: v.number(),
+    createdByEmail: v.optional(v.string()),
+  }).index("by_createdAt", ["createdAt"]),
+
+  notificationAcks: defineTable({
+    notificationId: v.id("notifications"),
+    viewerId: v.string(),
+    acknowledgedAt: v.number(),
+  })
+    .index("by_viewer", ["viewerId"])
+    .index("by_viewer_notification", ["viewerId", "notificationId"]),
 });

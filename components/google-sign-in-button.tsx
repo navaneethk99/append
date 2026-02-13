@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Chrome } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 
 export function GoogleSignInButton() {
@@ -20,9 +21,9 @@ export function GoogleSignInButton() {
       type="button"
       onClick={handleGoogleSignIn}
       disabled={isLoading}
-      className="acm-btn-ghost w-full justify-center text-xs disabled:cursor-not-allowed disabled:opacity-70"
+      className="acm-btn-ghost w-full justify-center gap-2 text-xs disabled:cursor-not-allowed disabled:opacity-70"
     >
-      <span className="inline-block size-5 rounded-full bg-[conic-gradient(#ea4335_0_90deg,#fbbc05_90deg_180deg,#34a853_180deg_270deg,#4285f4_270deg_360deg)]" />
+      <Chrome className="size-4 text-sky-200" aria-hidden="true" />
       {isLoading ? "Connecting to Google..." : "Continue with Google"}
     </button>
   );

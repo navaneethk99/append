@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useConvex, useMutation, useQuery } from "convex/react";
+import { Github } from "lucide-react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { authClient } from "@/lib/auth-client";
 import { convexFunctions } from "@/lib/convex-functions";
@@ -374,15 +375,38 @@ export default function JoinAppendListPage() {
         },
       });
 
+      const header =
+        payload.listType === "github"
+          ? "name,emailid,register_no,github_username,joining_time"
+          : payload.listType === "others"
+            ? "name,emailid,register_no,input_1,joining_time"
+            : "name,emailid,register_no,joining_time";
+
       const csvRows = [
-        "name,emailid,register_no,joining_time",
+        header,
         ...payload.rows.map((person) =>
-          [
-            csvCell(person.name),
-            csvCell(person.emailId),
-            csvCell(person.registerNo),
-            csvCell(person.joiningTime),
-          ].join(","),
+          payload.listType === "github"
+            ? [
+                csvCell(person.name),
+                csvCell(person.emailId),
+                csvCell(person.registerNo),
+                csvCell(person.githubUsername),
+                csvCell(person.joiningTime),
+              ].join(",")
+            : payload.listType === "others"
+              ? [
+                  csvCell(person.name),
+                  csvCell(person.emailId),
+                  csvCell(person.registerNo),
+                  csvCell((person.input1 ?? []).join(" | ")),
+                  csvCell(person.joiningTime),
+                ].join(",")
+              : [
+                  csvCell(person.name),
+                  csvCell(person.emailId),
+                  csvCell(person.registerNo),
+                  csvCell(person.joiningTime),
+                ].join(","),
         ),
       ];
 
@@ -433,9 +457,24 @@ export default function JoinAppendListPage() {
               .filter((username): username is string => Boolean(username))
               .map((username, index) => `${index + 1}. ${username}`)
               .join("\n")
-          : payload.rows
-              .map((person, index) => `${index + 1}. ${person.name}`)
-              .join("\n");
+          : payload.listType === "others"
+            ? payload.rows
+                .map((person, index) => {
+                  const items = (person.input1 ?? [])
+                    .map((item) => item.trim())
+                    .filter(Boolean);
+                  const registerNo = person.registerNo?.trim();
+                  const suffix = items.length
+                    ? ` [ ${items.join(" | ")} ]`
+                    : "";
+                  return `${index + 1}. ${person.name}${
+                    registerNo ? ` ${registerNo}` : ""
+                  }${suffix}`;
+                })
+                .join("\n")
+            : payload.rows
+                .map((person, index) => `${index + 1}. ${person.name}`)
+                .join("\n");
 
       if (!formatted.trim()) {
         setError(
@@ -467,21 +506,27 @@ export default function JoinAppendListPage() {
     }
 
     return detail.people.map((person) => {
+      const inputValues =
+        detail.list.type === "others" ? (person.input1 ?? []) : [];
       const searchKey = buildSearchKey([
         person.name,
         person.registerNo,
         person.githubUsername,
+        ...inputValues,
       ]);
+
+      const displayName =
+        detail.list.type === "github" && person.githubUsername
+          ? `${person.name} (${person.githubUsername})`
+          : person.name;
 
       return {
         ...person,
-        displayName: person.githubUsername
-          ? `${person.name} (${person.githubUsername})`
-          : person.name,
+        displayName,
         searchKey,
       };
     });
-  }, [detail?.people]);
+  }, [detail?.people, detail?.list.type]);
 
   const filteredPeople = useMemo(() => {
     if (peopleIndex.length === 0) {
@@ -508,9 +553,7 @@ export default function JoinAppendListPage() {
           <header className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-2">
               <p className="acm-label">Append List</p>
-              <h1 className="acm-heading-display text-3xl md:text-4xl">
-                Feed
-              </h1>
+              <h1 className="acm-heading-display text-3xl md:text-4xl">Feed</h1>
               <p className="text-sm text-white/70">
                 Join, search, and export append lists from the live control
                 surface.
@@ -626,7 +669,7 @@ export default function JoinAppendListPage() {
                           onChange={(event) =>
                             setSearchQuery(event.target.value)
                           }
-                          placeholder="Search name, surname, reg no, GitHub username"
+                          placeholder="Search name, reg no, GitHub username, inputs"
                           className="acm-input text-sm"
                         />
                         <p className="text-xs text-white/50">
@@ -643,12 +686,26 @@ export default function JoinAppendListPage() {
                     ) : (
                       <div className="grid gap-2 md:grid-cols-2">
                         {filteredPeople.map((person) => (
-                          <p
+                          <div
                             key={person.id}
                             className="rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white/70"
                           >
-                            {person.displayName}
-                          </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm text-white/80">
+                                {person.displayName}
+                              </span>
+                              {detail.list.type === "others"
+                                ? (person.input1 ?? []).map((item, index) => (
+                                    <span
+                                      key={`${person.id}-item-${index}`}
+                                      className="acm-pill text-[0.6rem]"
+                                    >
+                                      {item}
+                                    </span>
+                                  ))
+                                : null}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     )}
@@ -686,8 +743,12 @@ export default function JoinAppendListPage() {
                         type="button"
                         onClick={handleConnectGithub}
                         disabled={isConnectingGithub}
-                        className="acm-btn-ghost w-full text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                        className="acm-btn-ghost w-full justify-center gap-2 text-xs disabled:cursor-not-allowed disabled:opacity-70"
                       >
+                        <Github
+                          className="size-4 text-white/80"
+                          aria-hidden="true"
+                        />
                         {isConnectingGithub
                           ? "Redirecting to GitHub..."
                           : "Continue with GitHub"}
@@ -716,7 +777,7 @@ export default function JoinAppendListPage() {
                       onClick={() =>
                         setOtherInputs((current) => [...current, ""])
                       }
-                      className="acm-btn-ghost text-xs"
+                      className="text-xs text-white/60 underline-offset-4 hover:text-white hover:underline"
                     >
                       + Add Input
                     </button>
