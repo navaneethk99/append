@@ -243,7 +243,12 @@ export const getListDetail = query({
       joined = Boolean(joinedRecord);
     }
 
-    let peopleForDetail: Array<{ id: string; name: string }> = [];
+    let peopleForDetail: Array<{
+      id: string;
+      name: string;
+      registerNo?: string;
+      githubUsername?: string;
+    }> = [];
     if (listType === "github") {
       const people = await db
         .query("appendListGithubPeople")
@@ -255,7 +260,9 @@ export const getListDetail = query({
         .sort((a, b) => a.createdAt - b.createdAt)
         .map((person) => ({
           id: person._id,
-          name: `${person.name} (${person.githubUsername})`,
+          name: person.name,
+          registerNo: person.registerNo,
+          githubUsername: person.githubUsername,
         }));
     } else if (listType === "others") {
       const people = await db
@@ -269,6 +276,7 @@ export const getListDetail = query({
         .map((person) => ({
           id: person._id,
           name: person.name,
+          registerNo: person.registerNo,
         }));
     } else {
       const people = await db
@@ -282,6 +290,7 @@ export const getListDetail = query({
         .map((person) => ({
           id: person._id,
           name: person.name,
+          registerNo: person.registerNo,
         }));
     }
 

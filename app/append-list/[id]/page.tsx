@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -10,6 +10,38 @@ import { convexFunctions } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
+
+const normalizeSearchValue = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+const tokenizeSearch = (query: string) =>
+  normalizeSearchValue(query)
+    .split(/\s+/)
+    .filter(Boolean);
+
+const buildSearchKey = (parts: Array<string | undefined>) =>
+  normalizeSearchValue(parts.filter(Boolean).join(" ")).replace(/\s+/g, "");
+
+const isSubsequence = (needle: string, haystack: string) => {
+  if (!needle) {
+    return true;
+  }
+
+  let needleIndex = 0;
+  for (let i = 0; i < haystack.length; i += 1) {
+    if (haystack[i] === needle[needleIndex]) {
+      needleIndex += 1;
+      if (needleIndex === needle.length) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+};
 
 export default function JoinAppendListPage() {
   const params = useParams<{ id: string }>();
@@ -48,6 +80,7 @@ export default function JoinAppendListPage() {
   const [autoJoinGithubRequested, setAutoJoinGithubRequested] = useState(false);
   const [hasAttemptedAutoJoinGithub, setHasAttemptedAutoJoinGithub] =
     useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleJoin = useCallback(
@@ -431,6 +464,43 @@ export default function JoinAppendListPage() {
     }
   };
 
+  const peopleIndex = useMemo(() => {
+    if (!detail?.people) {
+      return [];
+    }
+
+    return detail.people.map((person) => {
+      const searchKey = buildSearchKey([
+        person.name,
+        person.registerNo,
+        person.githubUsername,
+      ]);
+
+      return {
+        ...person,
+        displayName: person.githubUsername
+          ? `${person.name} (${person.githubUsername})`
+          : person.name,
+        searchKey,
+      };
+    });
+  }, [detail?.people]);
+
+  const filteredPeople = useMemo(() => {
+    if (peopleIndex.length === 0) {
+      return [];
+    }
+
+    const tokens = tokenizeSearch(searchQuery);
+    if (tokens.length === 0) {
+      return peopleIndex;
+    }
+
+    return peopleIndex.filter((person) =>
+      tokens.every((token) => isSubsequence(token, person.searchKey)),
+    );
+  }, [peopleIndex, searchQuery]);
+
   return (
     <>
       <main className="grid min-h-screen place-items-center px-6 py-16">
@@ -517,15 +587,28 @@ export default function JoinAppendListPage() {
               <h2 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700">
                 People in this list
               </h2>
+              {detail.people.length > 0 ? (
+                <div className="space-y-2">
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search name, surname, reg no, GitHub username"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Showing {filteredPeople.length} of {detail.people.length}
+                  </p>
+                </div>
+              ) : null}
               {detail.people.length === 0 ? (
                 <p className="text-sm text-slate-600">No names added yet.</p>
               ) : (
-                detail.people.map((person) => (
+                filteredPeople.map((person) => (
                   <p
                     key={person.id}
                     className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700"
                   >
-                    {person.name}
+                    {person.displayName}
                   </p>
                 ))
               )}

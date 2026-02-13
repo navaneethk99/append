@@ -34,6 +34,8 @@ export type AppendList = {
 export type AppendPerson = {
   id: string;
   name: string;
+  registerNo?: string;
+  githubUsername?: string;
 };
 
 export type ListPermissions = {
