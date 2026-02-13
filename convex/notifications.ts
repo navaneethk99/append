@@ -1,5 +1,7 @@
-import { mutation, query } from "./_generated/server";
+import { action, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { api } from "./_generated/api";
+import webPush from "web-push";
 
 const parseAdminEmails = (value: string | undefined) => {
   if (!value) {
@@ -48,7 +50,7 @@ export const getNotificationState = query({
     viewerId: v.string(),
     viewerEmail: v.optional(v.string()),
   },
-  handler: async ({ db }, args) => {
+  handler: async ({ db, scheduler }, args) => {
     const acks = await db
       .query("notificationAcks")
       .withIndex("by_viewer", (q) => q.eq("viewerId", args.viewerId))
@@ -116,7 +118,169 @@ export const createNotification = mutation({
       acknowledgedAt: createdAt,
     });
 
+    await scheduler.runAfter(0, api.notifications.sendPushNotification, {
+      notificationId: id,
+    });
+
     return { id, createdAt };
+  },
+});
+
+export const registerPushSubscription = mutation({
+  args: {
+    viewerId: v.string(),
+    subscription: v.object({
+      endpoint: v.string(),
+      keys: v.object({
+        p256dh: v.string(),
+        auth: v.string(),
+      }),
+      expirationTime: v.optional(v.number()),
+    }),
+    userAgent: v.optional(v.string()),
+  },
+  handler: async ({ db }, args) => {
+    const now = Date.now();
+    const existing = await db
+      .query("pushSubscriptions")
+      .withIndex("by_endpoint", (q) => q.eq("endpoint", args.subscription.endpoint))
+      .unique();
+
+    if (existing) {
+      await db.patch(existing._id, {
+        viewerId: args.viewerId,
+        keys: args.subscription.keys,
+        expirationTime: args.subscription.expirationTime ?? undefined,
+        userAgent: args.userAgent,
+        updatedAt: now,
+      });
+      return { id: existing._id };
+    }
+
+    const id = await db.insert("pushSubscriptions", {
+      viewerId: args.viewerId,
+      endpoint: args.subscription.endpoint,
+      keys: args.subscription.keys,
+      expirationTime: args.subscription.expirationTime ?? undefined,
+      userAgent: args.userAgent,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return { id };
+  },
+});
+
+export const removePushSubscription = mutation({
+  args: {
+    endpoint: v.string(),
+  },
+  handler: async ({ db }, args) => {
+    const existing = await db
+      .query("pushSubscriptions")
+      .withIndex("by_endpoint", (q) => q.eq("endpoint", args.endpoint))
+      .unique();
+
+    if (existing) {
+      await db.delete(existing._id);
+    }
+
+    return { success: true };
+  },
+});
+
+export const getPushNotificationPayload = query({
+  args: {
+    notificationId: v.id("notifications"),
+  },
+  handler: async ({ db }, args) => {
+    const notification = await db.get(args.notificationId);
+    if (!notification) {
+      return null;
+    }
+
+    const subscriptions = await db.query("pushSubscriptions").collect();
+
+    return {
+      notification: {
+        id: notification._id,
+        title: notification.title,
+        message: notification.message,
+        createdAt: notification.createdAt,
+        createdByEmail: notification.createdByEmail,
+      },
+      subscriptions: subscriptions.map((subscription) => ({
+        endpoint: subscription.endpoint,
+        keys: subscription.keys,
+        expirationTime: subscription.expirationTime ?? undefined,
+      })),
+    };
+  },
+});
+
+export const sendPushNotification = action({
+  args: {
+    notificationId: v.id("notifications"),
+  },
+  handler: async (ctx, args) => {
+    const payload = await ctx.runQuery(
+      api.notifications.getPushNotificationPayload,
+      { notificationId: args.notificationId },
+    );
+
+    if (!payload) {
+      return { sent: 0, failed: 0 };
+    }
+
+    const publicKey = process.env.PUSH_VAPID_PUBLIC_KEY;
+    const privateKey = process.env.PUSH_VAPID_PRIVATE_KEY;
+    const subject = process.env.PUSH_VAPID_SUBJECT;
+
+    if (!publicKey || !privateKey || !subject) {
+      console.warn("Push notifications are not configured.");
+      return { sent: 0, failed: payload.subscriptions.length };
+    }
+
+    webPush.setVapidDetails(subject, publicKey, privateKey);
+
+    const notificationPayload = JSON.stringify({
+      title: payload.notification.title,
+      message: payload.notification.message,
+      url: "/",
+      notificationId: payload.notification.id,
+    });
+
+    const results = await Promise.allSettled(
+      payload.subscriptions.map((subscription) =>
+        webPush.sendNotification(subscription, notificationPayload),
+      ),
+    );
+
+    let sent = 0;
+    let failed = 0;
+
+    await Promise.all(
+      results.map(async (result, index) => {
+        if (result.status === "fulfilled") {
+          sent += 1;
+          return;
+        }
+
+        failed += 1;
+        const error = result.reason as { statusCode?: number };
+        const statusCode = error?.statusCode;
+        if (statusCode === 404 || statusCode === 410) {
+          const endpoint = payload.subscriptions[index]?.endpoint;
+          if (endpoint) {
+            await ctx.runMutation(api.notifications.removePushSubscription, {
+              endpoint,
+            });
+          }
+        }
+      }),
+    );
+
+    return { sent, failed };
   },
 });
 

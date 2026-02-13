@@ -65,4 +65,19 @@ export default defineSchema({
   })
     .index("by_viewer", ["viewerId"])
     .index("by_viewer_notification", ["viewerId", "notificationId"]),
+
+  pushSubscriptions: defineTable({
+    viewerId: v.string(),
+    endpoint: v.string(),
+    keys: v.object({
+      p256dh: v.string(),
+      auth: v.string(),
+    }),
+    expirationTime: v.optional(v.number()),
+    userAgent: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_viewer", ["viewerId"])
+    .index("by_endpoint", ["endpoint"]),
 });
