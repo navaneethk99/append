@@ -131,6 +131,18 @@ export const convexFunctions = {
     { viewerId: string; viewerEmail: string; title: string; message: string },
     { id: string; createdAt: number }
   >("notifications:createNotification"),
+  registerPushSubscription: mutation<
+    {
+      viewerId: string;
+      subscription: {
+        endpoint: string;
+        keys: { p256dh: string; auth: string };
+        expirationTime?: number;
+      };
+      userAgent?: string;
+    },
+    { id: string }
+  >("notifications:registerPushSubscription"),
   acknowledgeNotification: mutation<
     { notificationId: string; viewerId: string },
     { success: boolean }

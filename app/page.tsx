@@ -8,6 +8,18 @@ import { convexFunctions, type AppendList } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
+const urlBase64ToUint8Array = (base64String: string) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; i += 1) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+
+  return outputArray;
+};
 export default function Home() {
   const { data: session, isPending } = authClient.useSession();
   const convex = useConvex();
@@ -40,6 +52,9 @@ export default function Home() {
   const [notificationError, setNotificationError] = useState<string | null>(
     null,
   );
+  const [notificationPermission, setNotificationPermission] = useState<
+    NotificationPermission | "unsupported"
+  >("default");
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -65,6 +80,15 @@ export default function Home() {
     return;
   }, [showNotificationComposer]);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    setNotificationPermission(Notification.permission);
+  }, []);
+
   const notificationState = useQuery(
     convexFunctions.getNotificationState,
     viewerId && session?.user
@@ -81,15 +105,106 @@ export default function Home() {
     convexFunctions.acknowledgeNotification,
   );
   const createNotification = useMutation(convexFunctions.createNotification);
+  const registerPushSubscription = useMutation(
+    convexFunctions.registerPushSubscription,
+  );
+
+  useEffect(() => {
+    if (!viewerId || !session?.user) {
+      return;
+    }
+
+    if (
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator) ||
+      !("PushManager" in window) ||
+      !("Notification" in window)
+    ) {
+      return;
+    }
+
+    const publicKey = process.env.NEXT_PUBLIC_PUSH_VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const setupPush = async () => {
+      const registration = await navigator.serviceWorker.register(
+        "/notifications-sw.js",
+      );
+
+      if (Notification.permission !== "granted") {
+        return;
+      }
+
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+
+      const json = subscription.toJSON();
+      if (!json.keys?.p256dh || !json.keys?.auth) {
+        return;
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      await registerPushSubscription({
+        viewerId,
+        subscription: {
+          endpoint: json.endpoint,
+          keys: {
+            p256dh: json.keys.p256dh,
+            auth: json.keys.auth,
+          },
+          expirationTime: json.expirationTime ?? undefined,
+        },
+        userAgent: navigator.userAgent,
+      });
+    };
+
+    setupPush().catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    notificationPermission,
+    registerPushSubscription,
+    session?.user,
+    viewerId,
+  ]);
+
+  const handleEnableNotifications = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) {
+      setNotificationPermission("unsupported");
+      return;
+    }
+
+    const permission = await Notification.requestPermission();
+    setNotificationPermission(permission);
+
+    if (permission !== "granted") {
+      return;
+    }
+
+  };
 
   const canSendNotification = useMemo(
     () =>
       Boolean(
         isAdmin &&
-          notificationTitle.trim() &&
-          notificationMessage.trim() &&
-          viewerId &&
-          session?.user?.email,
+        notificationTitle.trim() &&
+        notificationMessage.trim() &&
+        viewerId &&
+        session?.user?.email,
       ),
     [
       isAdmin,
@@ -319,10 +434,11 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-3">
               {session?.user ? (
-                <span className="acm-pill">
-                  <span className="acm-status-dot" />
-                  Live
-                </span>
+                // <span className="acm-pill">
+                //   <span className="acm-status-dot" />
+                //   Live
+                // </span>
+                <></>
               ) : null}
               {session?.user ? (
                 <button
@@ -356,6 +472,35 @@ export default function Home() {
                         <span className="text-white">{session.user.email}</span>
                       </p>
                     </div>
+                    {notificationPermission === "default" ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/40 p-4">
+                        <div>
+                          <p className="text-sm text-white">
+                            Enable browser notifications
+                          </p>
+                          <p className="text-xs text-white/60">
+                            Get updates even when this tab is closed.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleEnableNotifications}
+                          className="acm-btn-primary text-xs"
+                        >
+                          Enable
+                        </button>
+                      </div>
+                    ) : null}
+                    {notificationPermission === "denied" ? (
+                      <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
+                        <p className="text-sm text-white">
+                          Browser notifications blocked
+                        </p>
+                        <p className="text-xs text-white/60">
+                          Update your browser settings to allow notifications.
+                        </p>
+                      </div>
+                    ) : null}
                     {lists === undefined ? (
                       <p className="text-sm text-white/70">
                         Loading your append lists...
@@ -482,49 +627,6 @@ export default function Home() {
                 )}
               </div>
             </section>
-
-            {/*<aside className="acm-card">
-              <div className="relative z-10 space-y-6">
-                <div>
-                  <p className="acm-label">Quick Actions</p>
-                  <h2 className="acm-heading text-lg">Start a New List</h2>
-                </div>
-
-                {isPending ? (
-                  <p className="text-sm text-white/70">
-                    Standing by for session check.
-                  </p>
-                ) : session?.user ? (
-                  <>
-                    <p className="text-sm text-white/70">
-                      Create a fresh append list and share it with your team.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleOpenCreateModal}
-                      disabled={isCreating}
-                      className="acm-btn-primary w-full text-xs disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isCreating ? "Creating..." : "Add Append List"}
-                    </button>
-                    <div className="rounded-2xl border border-white/10 bg-black/40 p-4">
-                      <p className="acm-label">Status</p>
-                      <p className="mt-2 text-sm text-white/70">
-                        {lists?.length ?? 0} active list
-                        {lists?.length === 1 ? "" : "s"} in your console.
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="text-sm text-white/70">
-                      Sign in to unlock list management and exports.
-                    </p>
-                    <GoogleSignInButton />
-                  </div>
-                )}
-              </div>
-            </aside>*/}
           </div>
         </div>
       </main>
@@ -557,9 +659,7 @@ export default function Home() {
               />
               <textarea
                 value={notificationMessage}
-                onChange={(event) =>
-                  setNotificationMessage(event.target.value)
-                }
+                onChange={(event) => setNotificationMessage(event.target.value)}
                 placeholder="Notification details..."
                 className="acm-input acm-notification-input text-sm"
                 rows={4}
@@ -614,9 +714,7 @@ export default function Home() {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    handleAcknowledgeNotification(notification.id)
-                  }
+                  onClick={() => handleAcknowledgeNotification(notification.id)}
                   className="acm-btn-ghost text-[0.7rem]"
                 >
                   Acknowledge
