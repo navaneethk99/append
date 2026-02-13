@@ -10,6 +10,7 @@
 
 import type * as appendLists from "../appendLists.js";
 import type * as notifications from "../notifications.js";
+import type * as push from "../push.js";
 
 import type {
   ApiFromModules,
@@ -20,6 +21,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   appendLists: typeof appendLists;
   notifications: typeof notifications;
+  push: typeof push;
 }>;
 
 /**
