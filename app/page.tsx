@@ -201,9 +201,7 @@ export default function Home() {
                     <h2 className="text-base font-semibold text-slate-900">
                       {list.title}
                     </h2>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {list.description}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-600">{list.description}</p>
                     <p className="mt-1 text-xs text-slate-500">
                       Created on {new Date(list.createdAt).toLocaleDateString()}
                     </p>
@@ -264,16 +262,12 @@ export default function Home() {
                     />
                     <textarea
                       value={newDescription}
-                      onChange={(event) =>
-                        setNewDescription(event.target.value)
-                      }
+                      onChange={(event) => setNewDescription(event.target.value)}
                       placeholder="Append list description"
                       className="min-h-28 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-sky-200 transition focus:ring"
                     />
                     {createError ? (
-                      <p className="text-sm font-medium text-red-600">
-                        {createError}
-                      </p>
+                      <p className="text-sm font-medium text-red-600">{createError}</p>
                     ) : null}
                   </div>
 

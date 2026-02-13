@@ -172,7 +172,9 @@ export default function JoinAppendListPage() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               {isPending ? (
-                <p className="text-sm text-slate-600">Checking your session...</p>
+                <p className="text-sm text-slate-600">
+                  Checking your session...
+                </p>
               ) : session?.user ? (
                 <>
                   <button
