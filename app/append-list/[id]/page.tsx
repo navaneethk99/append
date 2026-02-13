@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useConvex, useMutation, useQuery } from "convex/react";
@@ -38,7 +38,18 @@ export default function JoinAppendListPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isCopying, setIsCopying] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleJoin = async () => {
     setError(null);
@@ -139,6 +150,46 @@ export default function JoinAppendListPage() {
     }
   };
 
+  const handleCopyList = async () => {
+    if (!listId || !detail?.list || !session?.user) {
+      return;
+    }
+
+    setError(null);
+    setCopySuccess(false);
+    setIsCopying(true);
+
+    try {
+      const payload = await convex.query(convexFunctions.getExportRows, {
+        listId,
+        viewer: {
+          id: session.user.id,
+          email: session.user.email ?? undefined,
+          name: session.user.name ?? undefined,
+        },
+      });
+
+      const formatted = payload.rows
+        .map((person, index) =>
+          `${index + 1}. ${person.name}`,
+        )
+        .join("\n");
+
+      await navigator.clipboard.writeText(formatted);
+      setCopySuccess(true);
+      if (copyResetTimerRef.current) {
+        clearTimeout(copyResetTimerRef.current);
+      }
+      copyResetTimerRef.current = setTimeout(() => {
+        setCopySuccess(false);
+      }, 2000);
+    } catch {
+      setError("Could not copy list. Please try again.");
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   return (
     <main className="grid min-h-screen place-items-center px-6 py-16">
       <section className="w-full max-w-xl rounded-2xl border border-white/40 bg-white/85 p-8 shadow-xl backdrop-blur">
@@ -183,14 +234,28 @@ export default function JoinAppendListPage() {
                         : "Join Append List"}
                   </button>
                   {detail.permissions.canDownload ? (
-                    <button
-                      type="button"
-                      onClick={handleExportCsv}
-                      disabled={isExporting}
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
-                    >
-                      {isExporting ? "Downloading..." : "Download List CSV"}
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleExportCsv}
+                        disabled={isExporting}
+                        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isExporting ? "Downloading..." : "Download List CSV"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyList}
+                        disabled={isCopying}
+                        className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {isCopying
+                          ? "Copying..."
+                          : copySuccess
+                            ? "Copied"
+                            : "Copy List"}
+                      </button>
+                    </>
                   ) : null}
                 </>
               ) : (
