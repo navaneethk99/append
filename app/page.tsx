@@ -8,6 +8,8 @@ import { convexFunctions, type AppendList } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
+const listTypeLabel = (type: "nightslip" | "github" | "others") =>
+  type === "nightslip" ? "names" : type;
 const urlBase64ToUint8Array = (base64String: string) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -194,7 +196,6 @@ export default function Home() {
     if (permission !== "granted") {
       return;
     }
-
   };
 
   const canSendNotification = useMemo(
@@ -425,7 +426,7 @@ export default function Home() {
             <div className="max-w-2xl space-y-3">
               {/*<p className="acm-label">ACM-VIT</p>*/}
               <h1 className="acm-heading-display text-4xl md:text-5xl">
-                acmtwo
+                cute-little-append-lists
               </h1>
               <p className="acm-text-body text-sm text-white/70">
                 Spin up append lists, invite contributors, and keep the feed
@@ -572,7 +573,7 @@ export default function Home() {
                                   </p>
                                 </div>
                                 <span className="acm-pill">
-                                  Type {list.type}
+                                  Type {listTypeLabel(list.type)}
                                 </span>
                               </div>
                               <p className="mt-2 text-xs text-white/50">

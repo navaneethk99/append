@@ -11,6 +11,8 @@ import { convexFunctions } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
+const listTypeLabel = (type: "nightslip" | "github" | "others") =>
+  type === "nightslip" ? "names" : type;
 
 const normalizeSearchValue = (value: string) =>
   value
@@ -587,7 +589,9 @@ export default function JoinAppendListPage() {
                         {detail.list.description}
                       </p>
                     </div>
-                    <span className="acm-pill">Type {detail.list.type}</span>
+                    <span className="acm-pill">
+                      Type {listTypeLabel(detail.list.type)}
+                    </span>
                   </div>
 
                   <div className="flex flex-wrap gap-3">
