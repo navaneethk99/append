@@ -9,6 +9,7 @@
  */
 
 import type * as appendLists from "../appendLists.js";
+import type * as migrations from "../migrations.js";
 import type * as notifications from "../notifications.js";
 import type * as push from "../push.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   appendLists: typeof appendLists;
+  migrations: typeof migrations;
   notifications: typeof notifications;
   push: typeof push;
 }>;
