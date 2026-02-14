@@ -9,9 +9,33 @@ export function GoogleSignInButton() {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
+    let callbackURL = "/";
+
+    if (typeof window !== "undefined") {
+      callbackURL = window.location.href;
+
+      const params = new URLSearchParams(window.location.search);
+      const candidate =
+        params.get("returnTo") ||
+        params.get("redirect") ||
+        params.get("from") ||
+        params.get("callbackUrl");
+
+      if (candidate) {
+        try {
+          const parsed = new URL(candidate, window.location.origin);
+          if (parsed.origin === window.location.origin) {
+            callbackURL = parsed.toString();
+          }
+        } catch {
+          // Ignore invalid callback URL candidates.
+        }
+      }
+    }
+
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/",
+      callbackURL,
     });
     setIsLoading(false);
   };
