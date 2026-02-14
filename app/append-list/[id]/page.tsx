@@ -268,7 +268,7 @@ export default function JoinAppendListPage() {
   };
 
   const handleJoinClick = async () => {
-    if (detail?.list.type === "nightslip") {
+    if (detail?.list.type === "`") {
       await handleJoin();
       return;
     }
