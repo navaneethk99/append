@@ -7,7 +7,12 @@ export default defineSchema({
     title: v.string(),
     description: v.string(),
     listType: v.optional(
-      v.union(v.literal("names"), v.literal("github"), v.literal("others")),
+      v.union(
+        v.literal("names"),
+        v.literal("github"),
+        v.literal("others"),
+        v.literal("nightslip"),
+      ),
     ),
     listOwner: v.string(),
     createdAt: v.number(),
