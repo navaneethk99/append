@@ -11,8 +11,7 @@ import { convexFunctions } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
-const listTypeLabel = (type: "nightslip" | "github" | "others") =>
-  type === "nightslip" ? "names" : type;
+const listTypeLabel = (type: "names" | "github" | "others") => type;
 
 const normalizeSearchValue = (value: string) =>
   value
@@ -270,7 +269,7 @@ export default function JoinAppendListPage() {
   };
 
   const handleJoinClick = async () => {
-    if (detail?.list.type === "`") {
+    if (detail?.list.type === "names") {
       await handleJoin();
       return;
     }
