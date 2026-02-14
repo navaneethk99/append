@@ -5,12 +5,12 @@ import type { Id } from "./_generated/dataModel";
 
 const REGISTER_NO_PATTERN = /^[0-9]{2}[A-Z]{3}[0-9]{4}$/;
 const LIST_TYPE_VALIDATOR = v.union(
-  v.literal("nightslip"),
+  v.literal("names"),
   v.literal("github"),
   v.literal("others"),
 );
 
-type ListType = "nightslip" | "github" | "others";
+type ListType = "names" | "github" | "others";
 type PeopleTableName =
   | "appendListPeople"
   | "appendListGithubPeople"
@@ -21,7 +21,11 @@ const normalizeListType = (listType: string | undefined): ListType => {
     return listType;
   }
 
-  return "nightslip";
+  if (listType === "names" || listType === "nightslip") {
+    return "names";
+  }
+
+  return "names";
 };
 
 const getPeopleTableName = (listType: ListType): PeopleTableName => {
@@ -152,11 +156,13 @@ export const createList = mutation({
     const now = Date.now();
     const publicId = crypto.randomUUID();
 
+    const normalizedType = normalizeListType(args.listType);
+
     await db.insert("appendLists", {
       publicId,
       title,
       description,
-      listType: args.listType,
+      listType: normalizedType,
       listOwner: args.ownerId,
       createdAt: now,
       updatedAt: now,
@@ -166,7 +172,7 @@ export const createList = mutation({
       id: publicId,
       title,
       description,
-      type: args.listType,
+      type: normalizedType,
       createdAt: now,
       updatedAt: now,
       listOwner: args.ownerId,

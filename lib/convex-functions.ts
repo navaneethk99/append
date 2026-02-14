@@ -19,7 +19,7 @@ export type AppendList = {
   id: string;
   title: string;
   description: string;
-  type: "nightslip" | "github" | "others";
+  type: "names" | "github" | "others";
   createdAt: number;
   updatedAt: number;
   listOwner: string;
@@ -44,7 +44,7 @@ export type ListDetail = {
     id: string;
     title: string;
     description: string;
-    type: "nightslip" | "github" | "others";
+    type: "names" | "github" | "others";
   };
   people: AppendPerson[];
   permissions: ListPermissions;
@@ -52,7 +52,7 @@ export type ListDetail = {
 
 export type ExportRows = {
   listTitle: string;
-  listType: "nightslip" | "github" | "others";
+  listType: "names" | "github" | "others";
   rows: Array<{
     name: string;
     emailId?: string;
@@ -85,7 +85,7 @@ export const convexFunctions = {
       ownerId: string;
       title: string;
       description: string;
-      listType: "nightslip" | "github" | "others";
+      listType: "names" | "github" | "others";
     },
     AppendList
   >("appendLists:createList"),

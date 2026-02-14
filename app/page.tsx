@@ -8,8 +8,7 @@ import { convexFunctions, type AppendList } from "@/lib/convex-functions";
 
 const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
 const csvCell = (value: string | null | undefined) => escapeCsv(value ?? "");
-const listTypeLabel = (type: "nightslip" | "github" | "others") =>
-  type === "nightslip" ? "names" : type;
+const listTypeLabel = (type: "names" | "github" | "others") => type;
 const urlBase64ToUint8Array = (base64String: string) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -41,8 +40,8 @@ export default function Home() {
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newListType, setNewListType] = useState<
-    "nightslip" | "github" | "others"
-  >("nightslip");
+    "names" | "github" | "others"
+  >("names");
   const [createError, setCreateError] = useState<string | null>(null);
   const [showNotificationComposer, setShowNotificationComposer] =
     useState(false);
@@ -231,7 +230,7 @@ export default function Home() {
     setShowCreateModal(false);
     setNewTitle("");
     setNewDescription("");
-    setNewListType("nightslip");
+    setNewListType("names");
     setCreateError(null);
   };
 
@@ -288,7 +287,7 @@ export default function Home() {
 
   const downloadCsv = (
     listTitle: string,
-    listType: "nightslip" | "github" | "others",
+    listType: "names" | "github" | "others",
     rows: Array<{
       name: string;
       emailId?: string;
@@ -741,12 +740,12 @@ export default function Home() {
                   value={newListType}
                   onChange={(event) =>
                     setNewListType(
-                      event.target.value as "nightslip" | "github" | "others",
+                      event.target.value as "names" | "github" | "others",
                     )
                   }
                   className="acm-input text-sm"
                 >
-                  <option value="nightslip">names</option>
+                  <option value="names">names</option>
                   <option value="github">github</option>
                   <option value="others">others</option>
                 </select>
