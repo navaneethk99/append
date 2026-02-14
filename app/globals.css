@@ -4,8 +4,7 @@
   font-family: "PolySans Trial";
   src:
     local("PolySans Trial"),
-    url("/assets/fonts/PolySans-trial/PolySansTrial-Regular.woff2")
-      format("woff2");
+    url("/fonts/polysanstrial-neutral.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -15,8 +14,7 @@
   font-family: "PolySans Trial";
   src:
     local("PolySans Trial Medium"),
-    url("/assets/fonts/PolySans-trial/PolySansTrial-Medium.woff2")
-      format("woff2");
+    url("/fonts/polysanstrial-median.otf") format("opentype");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -26,8 +24,7 @@
   font-family: "PolySans Trial";
   src:
     local("PolySans Trial Slim"),
-    url("/assets/fonts/PolySans-trial/PolySansTrial-Light.woff2")
-      format("woff2");
+    url("/fonts/polysanstrial-slim.otf") format("opentype");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
@@ -37,7 +34,7 @@
   font-family: "PolySans Trial";
   src:
     local("PolySans Trial Bold"),
-    url("/assets/fonts/PolySans-trial/PolySansTrial-Bold.woff2") format("woff2");
+    url("/fonts/polysanstrial-bulky.otf") format("opentype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -47,7 +44,7 @@
   font-family: "PolySans Bulky Wide";
   src:
     local("PolySans Bulky Wide"),
-    url("/assets/fonts/PolySans-trial/PolySansBulkyWide.woff2") format("woff2");
+    url("/fonts/polysanstrial-bulkywide.otf") format("opentype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -57,7 +54,7 @@
   font-family: "PolySans Mono";
   src:
     local("PolySans Mono"),
-    url("/assets/fonts/PolySans-trial/PolySansMono.woff2") format("woff2");
+    url("/fonts/polysanstrial-medianmono.otf") format("opentype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -120,6 +117,18 @@ body {
   color: var(--color-acm-cream);
   font-family: var(--font-polysans), "Inter", "Segoe UI", sans-serif;
   letter-spacing: 0.01em;
+}
+
+.font-polysans {
+  font-family: var(--font-polysans), "Inter", "Segoe UI", sans-serif;
+}
+
+.font-polysans-wide {
+  font-family: var(--font-polysans-wide), sans-serif;
+}
+
+.font-polysans-mono {
+  font-family: var(--font-polysans-mono), ui-monospace, SFMono-Regular, monospace;
 }
 
 .acm-bg-dot-grid {

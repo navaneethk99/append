@@ -745,7 +745,7 @@ export default function Home() {
                   }
                   className="acm-input text-sm"
                 >
-                  <option value="nightslip">nightslip</option>
+                  <option value="nightslip">names</option>
                   <option value="github">github</option>
                   <option value="others">others</option>
                 </select>
