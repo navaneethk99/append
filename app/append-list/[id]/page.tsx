@@ -43,6 +43,13 @@ const isSubsequence = (needle: string, haystack: string) => {
   return false;
 };
 
+type EditablePerson = {
+  id: string;
+  name: string;
+  githubUsername?: string;
+  input1?: string[];
+};
+
 export default function JoinAppendListPage() {
   const params = useParams<{ id: string }>();
   const listId = params?.id;
@@ -50,6 +57,7 @@ export default function JoinAppendListPage() {
   const convex = useConvex();
   const joinList = useMutation(convexFunctions.joinList);
   const leaveList = useMutation(convexFunctions.leaveList);
+  const editListPerson = useMutation(convexFunctions.editListPerson);
 
   const detail = useQuery(
     convexFunctions.getListDetail,
@@ -81,6 +89,12 @@ export default function JoinAppendListPage() {
   const [hasAttemptedAutoJoinGithub, setHasAttemptedAutoJoinGithub] =
     useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingPersonId, setEditingPersonId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editGithubUsername, setEditGithubUsername] = useState("");
+  const [editOtherInputs, setEditOtherInputs] = useState<string[]>([""]);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleJoin = useCallback(
@@ -501,6 +515,78 @@ export default function JoinAppendListPage() {
     }
   };
 
+  const handleStartEdit = (person: EditablePerson) => {
+    setEditError(null);
+    setEditingPersonId(person.id);
+    setEditName(person.name);
+    setEditGithubUsername(person.githubUsername ?? "");
+    setEditOtherInputs(
+      person.input1 && person.input1.length > 0 ? person.input1 : [""],
+    );
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPersonId(null);
+    setEditError(null);
+    setEditName("");
+    setEditGithubUsername("");
+    setEditOtherInputs([""]);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!detail?.list || !listId || !session?.user || !editingPersonId) {
+      return;
+    }
+
+    setEditError(null);
+    setIsSavingEdit(true);
+
+    try {
+      const payload: {
+        listId: string;
+        userId: string;
+        email?: string;
+        name?: string;
+        personId: string;
+        updatedName?: string;
+        githubUsername?: string;
+        otherInputs?: string[];
+      } = {
+        listId,
+        userId: session.user.id,
+        email: session.user.email ?? undefined,
+        name: session.user.name ?? undefined,
+        personId: editingPersonId,
+        updatedName: editName.trim() || undefined,
+      };
+
+      if (detail.list.type === "github") {
+        const username = editGithubUsername.trim();
+        if (!username) {
+          setEditError("GitHub username is required.");
+          return;
+        }
+        payload.githubUsername = username;
+      }
+
+      if (detail.list.type === "others") {
+        const cleaned = editOtherInputs.map((value) => value.trim()).filter(Boolean);
+        if (cleaned.length === 0) {
+          setEditError("Add at least one input value.");
+          return;
+        }
+        payload.otherInputs = cleaned;
+      }
+
+      await editListPerson(payload);
+      handleCancelEdit();
+    } catch {
+      setEditError("Could not update this entry. Please try again.");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
   const peopleIndex = useMemo(() => {
     if (!detail?.people) {
       return [];
@@ -707,6 +793,15 @@ export default function JoinAppendListPage() {
                                     </span>
                                   ))
                                 : null}
+                              {person.canEdit ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(person)}
+                                  className="text-xs text-white/60 underline-offset-4 hover:text-white hover:underline"
+                                >
+                                  Edit
+                                </button>
+                              ) : null}
                             </div>
                           </div>
                         ))}
@@ -719,6 +814,89 @@ export default function JoinAppendListPage() {
           </section>
         </div>
       </main>
+
+      {editingPersonId && detail?.list ? (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 px-4">
+          <div className="acm-card w-full max-w-lg">
+            <div className="relative z-10 space-y-5">
+              <div>
+                <h2 className="acm-heading text-lg">Edit Entry</h2>
+                <p className="text-sm text-white/70">
+                  Update this append entry.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <input
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                  placeholder="Name"
+                  className="acm-input text-sm"
+                />
+
+                {detail.list.type === "github" ? (
+                  <input
+                    value={editGithubUsername}
+                    onChange={(event) => setEditGithubUsername(event.target.value)}
+                    placeholder="GitHub username"
+                    className="acm-input text-sm"
+                  />
+                ) : null}
+
+                {detail.list.type === "others" ? (
+                  <>
+                    {editOtherInputs.map((value, index) => (
+                      <input
+                        key={`${index}`}
+                        value={value}
+                        onChange={(event) => {
+                          setEditOtherInputs((current) => {
+                            const next = current.slice();
+                            next[index] = event.target.value;
+                            return next;
+                          });
+                        }}
+                        placeholder={`Input ${index + 1}`}
+                        className="acm-input text-sm"
+                      />
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setEditOtherInputs((current) => [...current, ""])}
+                      className="text-xs text-white/60 underline-offset-4 hover:text-white hover:underline"
+                    >
+                      + Add Input
+                    </button>
+                  </>
+                ) : null}
+
+                {editError ? (
+                  <p className="text-sm font-medium text-rose-300">{editError}</p>
+                ) : null}
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={isSavingEdit}
+                  className="acm-btn-primary flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSavingEdit ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  disabled={isSavingEdit}
+                  className="acm-btn-ghost flex-1 text-xs disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showJoinModal && detail?.list && !detail.permissions.hasJoined ? (
         <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 px-4">
