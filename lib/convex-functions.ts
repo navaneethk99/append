@@ -31,6 +31,7 @@ export type AppendPerson = {
   registerNo?: string;
   githubUsername?: string;
   input1?: string[];
+  canEdit?: boolean;
 };
 
 export type ListPermissions = {
@@ -119,6 +120,19 @@ export const convexFunctions = {
     { listId: string; userId: string; name?: string; email?: string },
     { success: boolean }
   >("appendLists:leaveList"),
+  editListPerson: mutation<
+    {
+      listId: string;
+      userId: string;
+      email?: string;
+      name?: string;
+      personId: string;
+      updatedName?: string;
+      githubUsername?: string;
+      otherInputs?: string[];
+    },
+    { success: boolean }
+  >("appendLists:editListPerson"),
   getExportRows: query<
     { listId: string; viewer: { id: string; email?: string; name?: string } },
     ExportRows

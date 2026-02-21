@@ -16,6 +16,48 @@ type PeopleTableName =
   | "appendListGithubPeople"
   | "appendListOtherPeople";
 
+const parseAdminEmails = (value: string | undefined) => {
+  if (!value) {
+    return new Set<string>();
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return new Set(
+        parsed
+          .map((entry) => String(entry).trim().toLowerCase())
+          .filter(Boolean),
+      );
+    }
+  } catch {
+    // Fallback to comma-separated parsing.
+  }
+
+  return new Set(
+    value
+      .split(",")
+      .map((entry) =>
+        entry
+          .trim()
+          .replace(/^\[/, "")
+          .replace(/\]$/, "")
+          .replace(/^['"]|['"]$/g, "")
+          .toLowerCase(),
+      )
+      .filter(Boolean),
+  );
+};
+
+const isAdminEmail = (email?: string) => {
+  const normalized = email?.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  return parseAdminEmails(process.env.ADMINS).has(normalized);
+};
+
 const normalizeListType = (listType: string | undefined): ListType => {
   if (listType === "github" || listType === "others") {
     return listType;
@@ -240,6 +282,9 @@ export const getListDetail = query({
     const tableName = getPeopleTableName(listType);
 
     const isOwner = args.viewer?.id === list.listOwner;
+    const isAdmin = isAdminEmail(args.viewer?.email);
+    const viewerEmail = args.viewer?.email?.trim().toLowerCase();
+    const viewerName = args.viewer?.name?.trim();
 
     let joined = false;
     if (args.viewer) {
@@ -276,6 +321,12 @@ export const getListDetail = query({
           name: person.name,
           registerNo: person.registerNo,
           githubUsername: person.githubUsername,
+          canEdit: Boolean(
+            args.viewer &&
+              (isAdmin ||
+                (viewerEmail && person.emailId === viewerEmail) ||
+                (viewerName && person.name === viewerName)),
+          ),
         }));
     } else if (listType === "others") {
       const people = await db
@@ -291,6 +342,12 @@ export const getListDetail = query({
           name: person.name,
           registerNo: person.registerNo,
           input1: person.input1,
+          canEdit: Boolean(
+            args.viewer &&
+              (isAdmin ||
+                (viewerEmail && person.emailId === viewerEmail) ||
+                (viewerName && person.name === viewerName)),
+          ),
         }));
     } else {
       const people = await db
@@ -305,6 +362,12 @@ export const getListDetail = query({
           id: person._id,
           name: person.name,
           registerNo: person.registerNo,
+          canEdit: Boolean(
+            args.viewer &&
+              (isAdmin ||
+                (viewerEmail && person.emailId === viewerEmail) ||
+                (viewerName && person.name === viewerName)),
+          ),
         }));
     }
 
@@ -450,6 +513,81 @@ export const leaveList = mutation({
     if (existing) {
       await db.delete(existing._id);
     }
+
+    return { success: true };
+  },
+});
+
+export const editListPerson = mutation({
+  args: {
+    listId: v.string(),
+    userId: v.string(),
+    email: v.optional(v.string()),
+    name: v.optional(v.string()),
+    personId: v.string(),
+    updatedName: v.optional(v.string()),
+    githubUsername: v.optional(v.string()),
+    otherInputs: v.optional(v.array(v.string())),
+  },
+  handler: async ({ db }, args) => {
+    const list = await db
+      .query("appendLists")
+      .withIndex("by_public_id", (q) => q.eq("publicId", args.listId))
+      .unique();
+
+    if (!list) {
+      throw new Error("Append list not found");
+    }
+
+    const listType = normalizeListType(list.listType);
+
+    const person = await db.get(args.personId as Id<PeopleTableName>);
+    if (!person || person.appendListId !== list._id) {
+      throw new Error("Append entry not found");
+    }
+
+    const normalizedEmail = args.email?.trim().toLowerCase();
+    const normalizedName = args.name?.trim();
+    const isAdmin = isAdminEmail(normalizedEmail);
+
+    const canEditOwnRecord =
+      (normalizedEmail && person.emailId === normalizedEmail) ||
+      (normalizedName && person.name === normalizedName);
+
+    if (!isAdmin && !canEditOwnRecord) {
+      throw new Error("Not allowed to edit this append entry");
+    }
+
+    const nextName = args.updatedName?.trim() || person.name;
+    const patch: {
+      name?: string;
+      registerNo?: string;
+      githubUsername?: string;
+      input1?: string[];
+    } = {
+      name: nextName,
+      registerNo: extractRegisterNo(nextName),
+    };
+
+    if (listType === "github") {
+      const githubUsername = args.githubUsername?.trim();
+      if (!githubUsername) {
+        throw new Error("GitHub username is required");
+      }
+      patch.githubUsername = githubUsername;
+    }
+
+    if (listType === "others") {
+      const input1 = (args.otherInputs ?? [])
+        .map((value) => value.trim())
+        .filter(Boolean);
+      if (input1.length === 0) {
+        throw new Error("At least one input is required");
+      }
+      patch.input1 = input1;
+    }
+
+    await db.patch(person._id, patch);
 
     return { success: true };
   },
