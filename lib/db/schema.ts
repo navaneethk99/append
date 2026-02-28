@@ -32,6 +32,19 @@ export const appendListPerson = pgTable("append_list_person", {
     .defaultNow(),
 });
 
+export const userGithubProfile = pgTable("user_github_profile", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  githubUsername: text("github_username").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const appendListTableRelations = relations(
   appendListTable,
   ({ one, many }) => ({
@@ -49,6 +62,16 @@ export const appendListPersonRelations = relations(
     list: one(appendListTable, {
       fields: [appendListPerson.appendListId],
       references: [appendListTable.id],
+    }),
+  }),
+);
+
+export const userGithubProfileRelations = relations(
+  userGithubProfile,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [userGithubProfile.userId],
+      references: [user.id],
     }),
   }),
 );
